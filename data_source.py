@@ -29,6 +29,7 @@ async def buy_stock_action(user_id: int, group_id: int, stock_id: str, gearing: 
     infolist = get_stock_info(stock_id)
     if len(infolist) <= 7:
         return f"未找到对应股票，提示：请使用股票代码而不是名字"
+    gearing = round(gearing, 1)
     price = float(infolist[3])
     name = infolist[1]
     lock = asyncio.Lock()
@@ -45,21 +46,41 @@ async def buy_stock_action(user_id: int, group_id: int, stock_id: str, gearing: 
                 return f"该股票涨停了，不能买哦"
             if float(infolist[5]) < -9.9 and gearing < 0:
                 return f"该股票跌停了，不能做空哦"
+
         num = cost / price
         uid = f"{user_id}:{group_id}"
+        stock = await StockDB.get_stock(uid, stock_id)
+        if stock.gearing != gearing:  # 杠杆改变
+            # 先把旧股票全卖了
+            earned = round((stock.number * price - stock.cost) * stock.gearing + stock.cost, 0)
+            # 加上当前本金
+            new_cost = earned + cost
+            # 算出当前股数
+            num = new_cost / price
+        # 再买
         query = await StockDB.buy_stock(
             uid, stock_id, gearing, num, cost
         )
         await StockLogDB.buy_stock_log(uid, stock_id, gearing, num, price, cost, query.buy_time)
         await BagUser.spend_gold(user_id, group_id, cost)
     if query:
-        return f"成功购买了 {round(num / 100, 2)} 手 {name}\n" \
-               f"现价 {price}亓\n" \
-               f"当前持仓 {round(query.number / 100, 2)}手\n" \
-               f"当前持仓价值 {round((query.number * price - query.cost) * query.gearing + query.cost, 2)}\n" \
-               f"当前持仓成本 {round(query.cost, 2)}\n" \
-               f"杠杆比率 {query.gearing}\n" \
-               f"剩余资金 {have_gold - cost}"
+        if stock.gearing == gearing:
+            return f"成功购买了 {round(num / 100, 2)} 手 {name}\n" \
+                   f"现价 {price}亓\n" \
+                   f"当前持仓 {round(query.number / 100, 2)}手\n" \
+                   f"当前持仓价值 {round((query.number * price - query.cost) * query.gearing + query.cost, 2)}\n" \
+                   f"当前持仓成本 {round(query.cost, 2)}\n" \
+                   f"杠杆比率 {query.gearing}\n" \
+                   f"剩余资金 {have_gold - cost}"
+        else:
+            return f"给{name}追加仓位{cost},修改杠杆为{gearing}" \
+                   f"当前持仓{round(num / 100, 2)} 手\n" \
+                   f"现价 {price}亓\n" \
+                   f"当前持仓 {round(query.number / 100, 2)}手\n" \
+                   f"当前持仓价值 {round((query.number * price - query.cost) * query.gearing + query.cost, 2)}\n" \
+                   f"当前持仓成本 {round(query.cost, 2)}\n" \
+                   f"杠杆比率 {query.gearing}\n" \
+                   f"剩余资金 {have_gold - cost}"
 
 
 # 上海深圳股票有涨跌停
@@ -95,7 +116,7 @@ async def sell_stock_action(user_id: int, group_id: int, stock_id: str, percent:
         await StockLogDB.sell_stock_log(
             uid=uid,
             stock_id=stock_id,
-            number=stock.number * percent/10,
+            number=stock.number * percent / 10,
             price=price,
             get=return_money,
             profit=(total_value - stock.cost) * percent * stock.gearing)
@@ -137,7 +158,7 @@ async def get_stock_list_action(uid: int, group_id: int):
             "code": stock.stock_id,
             "number": round(stock.number / 100, 2),
             "price_now": price,
-            "price_cost": round(stock.cost/stock.number, 2),
+            "price_cost": round(stock.cost / stock.number, 2),
             "gearing": stock.gearing,
             "cost": stock.cost,
             "value": round((stock.number * float(price) - stock.cost) * stock.gearing + stock.cost, 2),
@@ -158,14 +179,13 @@ async def get_stock_list_action_for_win(uid: int, group_id: int):
         return f"{infolist[1]} 代码{stock.stock_id}\n" \
                f"持仓数 {round(stock.number / 100, 2)}手\n" \
                f"现价 {price}亓\n" \
-               f"成本 {round(stock.cost/stock.number,2)}亓\n" \
+               f"成本 {round(stock.cost / stock.number, 2)}亓\n" \
                f"⚖比例 {stock.gearing}\n" \
                f"花费 {stock.cost}金\n" \
                f"当前价值 {round((stock.number * float(price) - stock.cost) * stock.gearing + stock.cost, 2)}金\n" \
                f"建仓时间 {time}"
 
     return [to_txt(stock) for stock in my_stocks]
-
 
 
 async def force_clear_action(user_id: int, group_id: int):

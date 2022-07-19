@@ -100,7 +100,7 @@ async def _(event: MessageEvent, arg: Message = CommandArg()):
     cost = int(msg[1])
     # 第三个参数是杠杆
     # 最大杠杆比率
-    if cost == 0:
+    if cost == 0 and len(msg) == 2:     # 专门用来看行情，但是加上杠杆参数就是改杠杆了
         await buy_stock.send(MessageSegment.image(await text_to_pic(f"你看了看，但没有买", width=300)))
         await buy_stock.finish(await get_stock_img(origin_stock_id, stock_id))
     if cost < 0:
