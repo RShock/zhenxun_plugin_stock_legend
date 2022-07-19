@@ -12,7 +12,6 @@ from utils.http_utils import AsyncPlaywright
 from configs.config import Config
 from ..nonebot_plugin_htmlrender import text_to_pic, md_to_pic
 
-
 from .data_source import (
     sell_stock_action,
     buy_stock_action,
@@ -62,7 +61,6 @@ __plugin_configs__ = {
 }
 __plugin_type__ = ("群内小游戏",)
 
-
 buy_stock = on_command("买股票", aliases={"买入", "建仓", "买入股票"}, priority=5, block=True)
 sell_stock = on_command("卖股票", aliases={"卖出", "清仓", "平仓", "卖出股票"}, priority=5, block=True)
 my_stock = on_command("我的持仓", aliases={"我的股票", "我的仓位"}, priority=5, block=True)
@@ -111,8 +109,13 @@ async def _(event: MessageEvent, arg: Message = CommandArg()):
     if len(msg) == 3:
         gearing = float(msg[2])
         if gearing > max_gearing:
-            await buy_stock.send(MessageSegment.image(await text_to_pic(
-                f"最高杠杆只能到{max_gearing}倍,\n已经修正为{max_gearing}倍", width=300)))
+            if -10 < cost < 10:  # 防呆，这人把输入参数顺序搞反了
+                cost, gearing = gearing, cost
+                await buy_stock.send(MessageSegment.image(await text_to_pic(
+                    f"你的杠杆和花费金币参数顺序反了，已经帮你修好了", width=300)))
+            else:
+                await buy_stock.send(MessageSegment.image(await text_to_pic(
+                    f"最高杠杆只能到{max_gearing}倍,\n已经修正为{max_gearing}倍", width=300)))
             gearing = max_gearing
         if gearing < -max_gearing:
             await buy_stock.send(MessageSegment.image(await text_to_pic(
