@@ -37,6 +37,8 @@ usage：
      支持股票类型：港股 美股 A股 基金
      注意：该游戏不会计算分红
      杠杆：单纯的将盈利和亏损乘以指定的系数，杠杆值为负数即为做空
+     进阶：就算已经买了股票，也可以随时再通过买股票+代码+金额+杠杆指令修改杠杆
+     如 买股票 600888 10000 5 即追加10000元仓位同时修改杠杆为5倍
     ————————————————
     强制清仓+qq号  管理专用指令，爆仓人不愿意清仓就对他使用这个吧
     ————————————————
@@ -213,8 +215,11 @@ async def get_stock_img(origin_stock_id: str, stock_id: str):
         url = f"https://gushitong.baidu.com/stock/hk-{origin_stock_id}"
     elif stock_id.startswith("us"):
         url = f"https://gushitong.baidu.com/stock/us-{origin_stock_id}"
+    elif stock_id == "IXIC":    # 纳斯达克指数
+        url = "https://gushitong.baidu.com/index/us-IXIC"
     else:
         url = f"https://gushitong.baidu.com/stock/ab-{origin_stock_id}"
+
     logger.info(url)
     return await AsyncPlaywright.screenshot(
         url,
