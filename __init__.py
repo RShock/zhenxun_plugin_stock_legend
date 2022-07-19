@@ -95,25 +95,28 @@ async def _(event: MessageEvent, arg: Message = CommandArg()):
 
     msg = arg.extract_plain_text().strip().split()
     if len(msg) < 2:
-        await buy_stock.finish("格式错误，请输入买股票 股票代码 杠杆层数 金额 如 买股票 600888 1000 5")
+        await buy_stock.finish(MessageSegment.image(await text_to_pic(
+            f"格式错误，请输入\n买股票 股票代码 杠杆层数 金额\n如 买股票 600888 1000 5", width=300)))
     stock_id = fill_stock_id(msg[0])
     origin_stock_id = stock_id[2:]
     cost = int(msg[1])
     # 第三个参数是杠杆
     # 最大杠杆比率
     if cost == 0:
-        await buy_stock.send(f"你看了看，但是没有买")
+        await buy_stock.send(MessageSegment.image(await text_to_pic(f"你看了看，但没有买", width=300)))
         await buy_stock.finish(await get_stock_img(origin_stock_id, stock_id))
     if cost < 0:
-        await buy_stock.finish(f"想做空的话请使用负数的杠杆率哦")
+        await buy_stock.finish(MessageSegment.image(await text_to_pic(f"想做空的话\n请使用负数的杠杆率哦", width=300)))
     max_gearing = round(float(Config.get_config("stock_legend", "GEARING_RATIO", 5)), 1)
     if len(msg) == 3:
         gearing = float(msg[2])
         if gearing > max_gearing:
-            await buy_stock.send(f"最高杠杆只能到{max_gearing}倍,已经修正为{max_gearing}倍")
+            await buy_stock.send(MessageSegment.image(await text_to_pic(
+                f"最高杠杆只能到{max_gearing}倍,\n已经修正为{max_gearing}倍", width=300)))
             gearing = max_gearing
         if gearing < -max_gearing:
-            await buy_stock.send(f"最高杠杆只能到-{max_gearing}倍,已经修正为-{max_gearing}倍")
+            await buy_stock.send(MessageSegment.image(await text_to_pic(
+                f"最高杠杆只能到-{max_gearing}倍,\n已经修正为-{max_gearing}倍", width=300)))
             gearing = -max_gearing
     else:
         gearing = 1
@@ -132,9 +135,13 @@ async def _(
         await buy_stock.finish("这个游戏只能在群里玩哦")
     msg = arg.extract_plain_text().strip().split()
     if len(msg) < 1:
-        await sell_stock.finish("格式错误，请输入卖股票 股票代码 [仓位(不填默认为十)] 如 买股票 601919 7.5")
+        await sell_stock.finish(MessageSegment.image(await text_to_pic(
+            "格式错误，请输入\n卖股票 股票代码 [仓位(不填默认为十)]\n如 卖股票 601919 10", width=300)))
     stock_id = fill_stock_id(msg[0])
-    percent = round(int(msg[1]), 2)
+    if len(msg) == 1:
+        percent = 10
+    else:
+        percent = round(int(msg[1]), 2)
     if percent > 10:
         await sell_stock.finish("不能卖十成以上的仓位哦")
     if percent <= 0:
