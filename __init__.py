@@ -80,7 +80,7 @@ def fill_stock_id(stock_id) -> str:
     if stock_id.startswith("60") or stock_id.startswith("11") or stock_id.startswith("5"):  # 上海与上海可转债与上海场内基金
         return "sh" + stock_id
     # 深圳与深圳可转债(12)与深圳创业板与深圳场内基金(1)
-    if stock_id.startswith("00") or stock_id.startswith("1") or stock_id.startswith("300"):
+    if stock_id.startswith("00") or stock_id.startswith("1") or stock_id.startswith("30"):
         return "sz" + stock_id
     if stock_id.startswith("4") or stock_id.startswith("8"):  # 北京
         return "bj" + stock_id
