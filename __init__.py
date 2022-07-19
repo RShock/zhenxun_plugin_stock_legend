@@ -143,7 +143,8 @@ async def _(
     else:
         percent = round(int(msg[1]), 2)
     if percent > 10:
-        await sell_stock.finish("不能卖十成以上的仓位哦")
+        await sell_stock.send("不能卖十成以上的仓位哦，已经帮你全卖了")
+        percent = 10
     if percent <= 0:
         await sell_stock.finish("卖的仓位太低了！")
     result = await sell_stock_action(event.user_id, event.group_id, stock_id, percent)
