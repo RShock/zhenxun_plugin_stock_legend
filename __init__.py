@@ -30,19 +30,21 @@ usage：
     买股票+代码+金额+杠杆倍数(可不填) 买入股票 例：买股票 600888 10000  (买入10000金币的仓位)
     卖股票+代码+仓位百分制 卖出股票 例：卖股票 600888 10 (卖出10层仓位)
     我的持仓
+    查看持仓+atQQ 偷看别人的持仓
+    关于股海风云 可以看看这个插件有没有更新，会发一个github链接，当心风控哦
     ————————————————
      如果要买基金，为防止混淆，需要在基金前面加上"jj" 
      例：邯钢转债(110001) 易方达平稳增长混合(jj110001)
-
+     
+     杠杆是什么？
+     简单理解为加倍和超级加倍即可
+     杠杆可以是负数（做空）
+     如果买股票时忘记输入杠杆也没关系，可以再买一次来修改杠杆
+     
      支持股票类型：港股 美股 A股 基金
      注意：该游戏不会计算分红
-     杠杆：单纯的将盈利和亏损乘以指定的系数，杠杆值为负数即为做空
-     进阶：就算已经买了股票，也可以随时再通过买股票+代码+金额+杠杆指令修改杠杆
-     如 买股票 600888 10000 5 即追加10000元仓位同时修改杠杆为5倍
     ————————————————
     强制清仓+qq号  管理专用指令，爆仓人不愿意清仓就对他使用这个吧
-    ————————————————
-                                                       游戏制作人：小r
 """.strip()
 __plugin_des__ = "谁才是股市传奇？"
 __plugin_cmd__ = ["买股票 代码 金额]", "卖股票 代码 仓位（十分制）", "我的持仓", "强制清仓"]
@@ -67,6 +69,10 @@ buy_stock = on_command("买股票", aliases={"买入", "建仓", "买入股票"}
 sell_stock = on_command("卖股票", aliases={"卖出", "清仓", "平仓", "卖出股票"}, priority=5, block=True)
 my_stock = on_command("我的持仓", aliases={"我的股票", "我的仓位"}, priority=5, block=True)
 clear_stock = on_command("强制清仓", priority=5, permission=SUPERUSER, block=True)
+look_stock = on_command("查看持仓", aliases={"偷看持仓"}, priority=5, block=True)
+help_stock = on_command("关于股海风云", priority=5, block=True)
+
+fit = False  # win适配
 
 
 # 查询接口时需要补全股票代码的所在地
@@ -102,16 +108,16 @@ async def _(event: MessageEvent, arg: Message = CommandArg()):
     cost = int(msg[1])
     # 第三个参数是杠杆
     # 最大杠杆比率
-    if cost == 0 and len(msg) == 2:     # 专门用来看行情，但是加上杠杆参数就是改杠杆了
+    if cost == 0 and len(msg) == 2:  # 专门用来看行情，但是加上杠杆参数就是改杠杆了
         await buy_stock.send(MessageSegment.image(await text_to_pic(f"你看了看，但没有买", width=300)))
-        await buy_stock.finish(await get_stock_img(origin_stock_id, stock_id))
+        await buy_stock.finish(await get_stock_img(origin_stock_id, stock_id, True))
     if cost < 0:
         await buy_stock.finish(MessageSegment.image(await text_to_pic(f"想做空的话\n请使用负数的杠杆率哦", width=300)))
     max_gearing = round(float(Config.get_config("stock_legend", "GEARING_RATIO", 5)), 1)
     if len(msg) == 3:
         gearing = float(msg[2])
         if gearing > max_gearing:
-            if -10 < cost < 10:  # 防呆，这人把输入参数顺序搞反了
+            if -max_gearing <= cost <= max_gearing:  # 防呆，这人把输入参数顺序搞反了
                 cost, gearing = gearing, cost
                 await buy_stock.send(MessageSegment.image(await text_to_pic(
                     f"你的杠杆和花费金币参数顺序反了，已经帮你修好了", width=300)))
@@ -124,7 +130,7 @@ async def _(event: MessageEvent, arg: Message = CommandArg()):
                 f"最高杠杆只能到-{max_gearing}倍,\n已经修正为-{max_gearing}倍", width=300)))
             gearing = -max_gearing
     else:
-        gearing = 1
+        gearing = None  # 缺省值
     result = await buy_stock_action(event.user_id, event.group_id, stock_id, gearing, cost)
 
     await buy_stock.send(MessageSegment.image(await text_to_pic(result, width=300)))
@@ -176,8 +182,11 @@ async def _(event: MessageEvent, bot: Bot, state: T_State, arg: Message = Comman
     if not isinstance(event, GroupMessageEvent):
         await buy_stock.finish("这个游戏只能在群里玩哦")
 
-    # linux下使用这套逻辑
-    if platform.system().lower() == 'linux':
+    if fit:
+        if platform.system().lower() == 'windows':
+            my_stocks = await get_stock_list_action_for_win(event.user_id, event.group_id)
+            await send_forward_msg_group(bot, event, "真寻炒股小助手", my_stocks if my_stocks else ["你还什么都没买呢！"])
+    else:
         my_stocks = await get_stock_list_action(event.user_id, event.group_id)
         if not my_stocks:
             await sell_stock.finish(MessageSegment.image(await text_to_pic("你还什么都没买呢！", width=300)))
@@ -185,10 +194,30 @@ async def _(event: MessageEvent, bot: Bot, state: T_State, arg: Message = Comman
         logger.info(txt)
         await sell_stock.finish(MessageSegment.image(await md_to_pic(f"{txt}", width=1000)))
 
-    # windows下使用这套逻辑(风控差一点)
-    if platform.system().lower() == 'windows':
-        my_stocks = await get_stock_list_action_for_win(event.user_id, event.group_id)
-        await send_forward_msg_group(bot, event, "真寻炒股小助手", my_stocks if my_stocks else ["你还什么都没买呢！"])
+
+@look_stock.handle()
+async def _(event: MessageEvent, bot: Bot, args: Message = CommandArg(), arg: Message = CommandArg()):
+    if not isinstance(event, GroupMessageEvent):
+        await buy_stock.finish("这个游戏只能在群里玩哦")
+
+    for arg in args:
+        if arg.type == "at":
+            look_qq = arg.data.get("qq", "")
+
+    if not look_qq:
+        look_qq = event.user_id
+
+    if fit:
+        if platform.system().lower() == 'windows':
+            my_stocks = await get_stock_list_action_for_win(event.user_id, event.group_id)
+            await send_forward_msg_group(bot, event, "真寻炒股小助手", my_stocks if my_stocks else ["仓位是空的"])
+    else:
+        my_stocks = await get_stock_list_action(look_qq, event.group_id)
+        if not my_stocks:
+            await sell_stock.finish(MessageSegment.image(await text_to_pic("仓位是空的", width=300)))
+        txt = convert_stocks_to_md_table(my_stocks)
+        logger.info(txt)
+        await sell_stock.finish(MessageSegment.image(await md_to_pic(f"{txt}", width=1000)))
 
 
 # 合并消息
@@ -208,24 +237,27 @@ async def send_forward_msg_group(
 
 
 # 第一个参数是原始ID,第二个是加工后的
-# 如果是A股 可以靠自己抓百度的截图 其他情况交给api截图（缺点：1小时只能对一个链接截图1张，而且页面不好看）
-async def get_stock_img(origin_stock_id: str, stock_id: str):
+# 百度股市通能获取所有截图
+async def get_stock_img(origin_stock_id: str, stock_id: str, is_long: bool = False):
     # 这些可以交给百度股市通
     if len(origin_stock_id) == 5:
         url = f"https://gushitong.baidu.com/stock/hk-{origin_stock_id}"
     elif stock_id.startswith("us"):
         url = f"https://gushitong.baidu.com/stock/us-{origin_stock_id}"
-    elif stock_id == "IXIC":    # 纳斯达克指数
+    elif origin_stock_id == "IXIC":  # 纳斯达克指数
         url = "https://gushitong.baidu.com/index/us-IXIC"
     else:
         url = f"https://gushitong.baidu.com/stock/ab-{origin_stock_id}"
 
     logger.info(url)
+    if is_long:
+        tmp = "#app"
+    else:
+        tmp = ".fac"
     return await AsyncPlaywright.screenshot(
         url,
         f"{IMAGE_PATH}/temp/stockImg_{stock_id}_{time.time()}.png",
-        "#app",
-        viewport_size=dict(width=1080, height=1800),
+        tmp,
         wait_time=12
     )
 
@@ -242,3 +274,13 @@ async def _(event: MessageEvent, arg: Message = CommandArg()):
         await buy_stock.finish("格式错误，请输入强制清仓 qq号")
     cnt = await force_clear_action(int(msg[0]), event.group_id)
     await buy_stock.finish(MessageSegment.image(await text_to_pic(f"{msg[0]}的{cnt}仓位都被卖了", width=300)))
+
+
+@help_stock.handle()
+async def _():
+    await help_stock.finish("""
+        作者：小r
+        说明：这个插件可以帮多年后的你省很多钱！练习到每天盈利5%+就可以去玩真正的股市了
+        版本：v1.2
+        查看是否有更新：https://github.com/RShock/zhenxun_plugin_stock_legend
+    """)

@@ -6,6 +6,7 @@ from rfc3986.compat import to_str
 from models.bag_user import BagUser
 from .stock_model import StockDB
 from .stock_log_model import StockLogDB
+from configs.config import Config
 
 
 def get_stock_info(num) -> list:
@@ -29,17 +30,30 @@ async def buy_stock_action(user_id: int, group_id: int, stock_id: str, gearing: 
     infolist = get_stock_info(stock_id)
     if len(infolist) <= 7:
         return f"未找到对应股票，提示：请使用股票代码而不是名字"
-    gearing = round(gearing, 1)
     price = float(infolist[3])
     name = infolist[1]
     lock = asyncio.Lock()
     # 担心遇到线程问题，加了把锁（不知道有没有用）
     async with lock:
         have_gold = await BagUser.get_gold(user_id, group_id)
-        if have_gold < cost:
+        if 0 < cost <= 10:  # 如果花费小于10，认为他说的是仓位而不是花费
+            cost = have_gold * cost / 10
+        elif have_gold < cost:
             return f"你当前只有{have_gold},买不起{cost}的股票哦"
         if price == 0:
             return f"{name}停牌了，不能买哦"
+
+        uid = f"{user_id}:{group_id}"
+        stock = await StockDB.get_stock(uid, stock_id)
+        # 先理清楚杠杆到底是多少
+        if stock:
+            if not gearing:
+                gearing = stock.gearing
+
+        if not gearing:
+            max_gearing = round(float(Config.get_config("stock_legend", "GEARING_RATIO", 5)), 1)
+            gearing = max_gearing
+        gearing = round(gearing, 1)
         # 涨停的股票不能买可以做空 跌停的股票反之（A股特供，防止打板战术）
         if is_a_stock(stock_id):
             if float(infolist[5]) > 9.9 and gearing >= 0:
@@ -48,15 +62,15 @@ async def buy_stock_action(user_id: int, group_id: int, stock_id: str, gearing: 
                 return f"该股票跌停了，不能做空哦"
 
         num = cost / price
-        uid = f"{user_id}:{group_id}"
-        stock = await StockDB.get_stock(uid, stock_id)
-        if stock.gearing != gearing:  # 杠杆改变
+        origin_cost = cost
+        if stock and stock.gearing != gearing:  # 杠杆改变的逻辑
             # 先把旧股票全卖了
             earned = round((stock.number * price - stock.cost) * stock.gearing + stock.cost, 0)
             # 加上当前本金
-            new_cost = earned + cost
+            cost = earned + cost
             # 算出当前股数
-            num = new_cost / price
+            num = cost / price
+            await sell_stock_action(user_id, group_id, stock_id, 10)
         # 再买
         query = await StockDB.buy_stock(
             uid, stock_id, gearing, num, cost
@@ -64,17 +78,17 @@ async def buy_stock_action(user_id: int, group_id: int, stock_id: str, gearing: 
         await StockLogDB.buy_stock_log(uid, stock_id, gearing, num, price, cost, query.buy_time)
         await BagUser.spend_gold(user_id, group_id, cost)
     if query:
-        if stock.gearing == gearing:
-            return f"成功购买了 {round(num / 100, 2)} 手 {name}\n" \
-                   f"现价 {price}亓\n" \
-                   f"当前持仓 {round(query.number / 100, 2)}手\n" \
-                   f"当前持仓价值 {round((query.number * price - query.cost) * query.gearing + query.cost, 2)}\n" \
-                   f"当前持仓成本 {round(query.cost, 2)}\n" \
-                   f"杠杆比率 {query.gearing}\n" \
-                   f"剩余资金 {have_gold - cost}"
+        if stock and stock.gearing != gearing:
+            return f'给{name}追加仓位{origin_cost},修改杠杆为{gearing}\n' \
+                   f'因为杠杆的调整，持仓被重新计算了\n' \
+                   f'现价 {price}亓\n' \
+                   f'当前持仓 {round(query.number / 100, 2)}手\n' \
+                   f'当前持仓价值 {round((query.number * price - query.cost) * query.gearing + query.cost, 2)}\n' \
+                   f'当前持仓成本 {round(query.cost, 2)}\n' \
+                   f'杠杆比率 {query.gearing}\n' \
+                   f'剩余资金 {have_gold - cost}'
         else:
-            return f"给{name}追加仓位{cost},修改杠杆为{gearing}" \
-                   f"当前持仓{round(num / 100, 2)} 手\n" \
+            return f"成功购买了 {round(num / 100, 2)} 手 {name}\n" \
                    f"现价 {price}亓\n" \
                    f"当前持仓 {round(query.number / 100, 2)}手\n" \
                    f"当前持仓价值 {round((query.number * price - query.cost) * query.gearing + query.cost, 2)}\n" \
