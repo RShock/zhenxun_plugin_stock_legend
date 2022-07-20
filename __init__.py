@@ -47,8 +47,9 @@ usage：
     强制清仓+qq号  管理专用指令，爆仓人不愿意清仓就对他使用这个吧
 """.strip()
 __plugin_des__ = "谁才是股市传奇？"
+__plugin_type__ = ("群内小游戏", )
 __plugin_cmd__ = ["买股票 代码 金额]", "卖股票 代码 仓位（十分制）", "我的持仓", "强制清仓"]
-__plugin_version__ = 0.1
+__plugin_version__ = 1.3
 __plugin_author__ = "XiaoR"
 __plugin_settings__ = {
     "level": 5,
@@ -63,7 +64,6 @@ __plugin_configs__ = {
         "default_value": 5,
     }
 }
-__plugin_type__ = ("群内小游戏",)
 
 buy_stock = on_command("买股票", aliases={"买入", "建仓", "买入股票"}, priority=5, block=True)
 sell_stock = on_command("卖股票", aliases={"卖出", "清仓", "平仓", "卖出股票"}, priority=5, block=True)
@@ -172,6 +172,11 @@ def convert_stocks_to_md_table(stocks):
              "| --- | --- | --- | --- | --- | --- | --- | --- | --- |\n"
 
     def to_md(s):
+        # 染色
+        if s['value'] > s['cost']:
+            s['value'] = f"<font color=\"#dd0000\">{s['value']}</font>"
+        elif s['value'] < s['cost']:
+            s['value'] = f"<font color=\"#00dd00\">{s['value']}</font>"
         return f"|{s['name']}|{s['code']}|{s['number']}|{s['price_now']}|{s['price_cost']}|{s['gearing']}" \
                f"|{s['cost']}|{s['value']}|{s['create_time']}|\n"
 
@@ -284,5 +289,5 @@ async def _():
     await help_stock.finish(
         """作者：小r
 说明：这个插件可以帮多年后的你省很多钱！练习到每天盈利5%+就可以去玩真正的股市了
-版本：v1.2
+版本：v1.3
 查看是否有更新：https://github.com/RShock/zhenxun_plugin_stock_legend""")
