@@ -36,6 +36,8 @@ async def buy_stock_action(user_id: int, group_id: int, stock_id: str, gearing: 
     # 担心遇到线程问题，加了把锁（不知道有没有用）
     async with lock:
         have_gold = await BagUser.get_gold(user_id, group_id)
+        if have_gold <= 0:
+            return f"你没有钱买股票"
         if 0 < cost <= 10:  # 如果花费小于10，认为他说的是仓位而不是花费
             cost = have_gold * cost / 10
         elif have_gold < cost:
@@ -124,6 +126,8 @@ async def sell_stock_action(user_id: int, group_id: int, stock_id: str, percent:
         await StockDB.sell_stock(
             uid, stock_id, percent
         )
+        if stock.cost <= 0:  # 正常情况不会出现，但是一旦出现需要异常修复
+            stock.cost = 1
         total_value = (stock.number * price - stock.cost) * stock.gearing + stock.cost
         return_money = round(total_value * percent / 10, 0)
         earned_percent = round((total_value - stock.cost) / stock.cost * 100, 2)
