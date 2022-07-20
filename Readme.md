@@ -64,11 +64,27 @@ v1.2
 该插件与赛马插件都需要`nonebot_html_render`插件，之前配过赛马的用起来会比较轻松。
 这个插件在windows系统下运行时可能有一些问题。
 
-如果你在win下运行`我的持仓`指令出现错误，请将`__init__.py`中179行附近的`fit = False`
+如果你在win下运行`我的持仓`指令出现错误（注意，如果仅仅是插件无法安装，和这个无关），请将`__init__.py`中179行附近的`fit = False`
 改成`fit = True`，系统会尝试使用另一套代码输出持仓
 
 将[nonebot_html_render](https://github.com/kexue-z/nonebot-plugin-htmlrender/tree/master/nonebot_plugin_htmlrender)
 放置到真寻的extensive_plugins里（本插件与其同级），然后可能还需要安装一点依赖就可以运行了
 （具体安装哪些看运行时是否报错）
+
+* 注意放进去的是链接点进去时看到的子文件夹，不要把整个`nonebot_html_render`项目放进去
+* 我已经把`nonebot_html_render`打包好了，你也可以解压就用
+* 按理说会缺2个依赖：`Jinjia2`和`markdown`，可以先提前装好
+
+``` 
+如果你的真寻不基于虚拟环境，应该尝试用这个
+pip3 install Jinjia2
+pip3 install markdown
+
+基于虚拟环境，应该尝试用这个
+poetry add Jinjia2
+poetry add markdown
+
+或者都尝试一下
+```
 
 
