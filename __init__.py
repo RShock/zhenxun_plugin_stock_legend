@@ -100,12 +100,15 @@ async def _(event: MessageEvent, arg: Message = CommandArg()):
         await buy_stock.finish("这个游戏只能在群里玩哦")
 
     msg = arg.extract_plain_text().strip().split()
-    if len(msg) < 2:
+    if len(msg) < 1:
         await buy_stock.finish(MessageSegment.image(await text_to_pic(
-            f"格式错误，请输入\n买股票 股票代码 杠杆层数 金额\n如 买股票 600888 1000 5", width=300)))
+            f"格式错误，请输入\n买股票 股票代码 金额 杠杆层数(可选)\n如 买股票 600888 1000 5", width=300)))
+    if len(msg) == 1:
+        cost = 10   # 10成仓位
+    else:
+        cost = int(msg[1])
     stock_id = fill_stock_id(msg[0])
     origin_stock_id = stock_id[2:]
-    cost = int(msg[1])
     # 第三个参数是杠杆
     # 最大杠杆比率
     if cost == 0 and len(msg) == 2:  # 专门用来看行情，但是加上杠杆参数就是改杠杆了
@@ -278,9 +281,8 @@ async def _(event: MessageEvent, arg: Message = CommandArg()):
 
 @help_stock.handle()
 async def _():
-    await help_stock.finish("""
-        作者：小r
-        说明：这个插件可以帮多年后的你省很多钱！练习到每天盈利5%+就可以去玩真正的股市了
-        版本：v1.2
-        查看是否有更新：https://github.com/RShock/zhenxun_plugin_stock_legend
-    """)
+    await help_stock.finish(
+        """作者：小r
+说明：这个插件可以帮多年后的你省很多钱！练习到每天盈利5%+就可以去玩真正的股市了
+版本：v1.2
+查看是否有更新：https://github.com/RShock/zhenxun_plugin_stock_legend""")
