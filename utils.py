@@ -77,7 +77,7 @@ def to_txt(stock: StockDB):
 
 async def get_stock_img(origin_stock_id: str, stock_id: str, is_long: bool = False):
     # 这些可以交给百度股市通
-    if len(origin_stock_id) == 5:
+    if len(origin_stock_id) == 5 and origin_stock_id.isdigit():
         url = f"https://gushitong.baidu.com/stock/hk-{origin_stock_id}"
     elif stock_id.startswith("us"):
         url = f"https://gushitong.baidu.com/stock/us-{origin_stock_id}"
@@ -150,7 +150,9 @@ def fill_stock_id(stock_id: str) -> str:
     if stock_id.startswith("sh") or stock_id.startswith("sz") or stock_id.startswith("hk") \
             or stock_id.startswith("us") or stock_id.startswith("jj"):
         return stock_id
-    if len(stock_id) == 5:  # 港股
+    if len(stock_id) == 4 and stock_id.isdigit():    # 港股
+        return "hk0" + stock_id
+    if len(stock_id) == 5 and stock_id.isdigit():  # 港股
         return "hk" + stock_id
     if stock_id.startswith("60") or stock_id.startswith("11") or stock_id.startswith("5"):  # 上海与上海可转债与上海场内基金
         return "sh" + stock_id
