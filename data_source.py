@@ -1,42 +1,28 @@
 import asyncio
-import urllib.request
-
-from rfc3986.compat import to_str
 
 from models.bag_user import BagUser
 from .stock_model import StockDB
 from .stock_log_model import StockLogDB
 from configs.config import Config
+from .utils import get_stock_info, get_total_value, to_obj, to_txt, is_a_stock, is_st_stock
 
 
-def get_stock_info(num) -> list:
-    f = urllib.request.urlopen('http://qt.gtimg.cn/q=s_' + to_str(num))
-    # return like: v_s_sz000858="51~五 粮 液~000858~18.10~0.01~0.06~94583~17065~~687.07";
-    strGB = f.readline().decode('gb2312')
-    f.close()
-    infolist = strGB[14:-3]
-    return infolist.split('~')
-
-
-# 股票名称: infolist[1]
-# 股票代码: infolist[2]
-# 当前价格: infolist[3]
-# 涨    跌: infolist[4]
-# 涨   跌%: infolist[5],'%'
-# 成交量(手):infolist[6]
-# 成交额(万):infolist[7]
-
-async def buy_stock_action(user_id: int, group_id: int, stock_id: str, gearing: float, cost: int) -> str:
+async def buy_stock_action(user_id: int, group_id: int, stock_id: str, gearing: float, cost: int,
+                           force_price: float = None) -> str:
     infolist = get_stock_info(stock_id)
     if len(infolist) <= 7:
+
         return f"未找到对应股票，提示：请使用股票代码而不是名字"
-    price = float(infolist[3])
+    if force_price:
+        price = force_price
+    else:
+        price = float(infolist[3])
     name = infolist[1]
     lock = asyncio.Lock()
     # 担心遇到线程问题，加了把锁（不知道有没有用）
     async with lock:
         have_gold = await BagUser.get_gold(user_id, group_id)
-        if have_gold <= 0:
+        if have_gold <= 0 and gearing is None:  # 先筛选一种情况
             return f"你没有钱买股票"
         if 0 < cost <= 10:  # 如果花费小于10，认为他说的是仓位而不是花费
             cost = have_gold * cost / 10
@@ -51,13 +37,19 @@ async def buy_stock_action(user_id: int, group_id: int, stock_id: str, gearing: 
         if stock:
             if not gearing:
                 gearing = stock.gearing
-
         if not gearing:
             max_gearing = round(float(Config.get_config("stock_legend", "GEARING_RATIO", 5)), 1)
             gearing = max_gearing
         gearing = round(gearing, 1)
+        if (stock and have_gold == 0 and gearing == stock.gearing) or (stock is None and have_gold == 0):
+            return f"你没有钱买股票"
         # 涨停的股票不能买可以做空 跌停的股票反之（A股特供，防止打板战术）
         if is_a_stock(stock_id):
+            if is_st_stock(name):
+                if float(infolist[5]) > 4.93 and gearing >= 0:
+                    return f"该股票涨停了，不能买哦"
+                if float(infolist[5]) < -4.93 and gearing < 0:
+                    return f"该股票跌停了，不能做空哦"
             if float(infolist[5]) > 9.9 and gearing >= 0:
                 return f"该股票涨停了，不能买哦"
             if float(infolist[5]) < -9.9 and gearing < 0:
@@ -67,12 +59,11 @@ async def buy_stock_action(user_id: int, group_id: int, stock_id: str, gearing: 
         origin_cost = cost
         if stock and stock.gearing != gearing:  # 杠杆改变的逻辑
             # 先把旧股票全卖了
-            earned = round((stock.number * price - stock.cost) * stock.gearing + stock.cost, 0)
+            earned = await fast_clear_stock(price, group_id, stock, user_id)
             # 加上当前本金
             cost = earned + cost
             # 算出当前股数
             num = cost / price
-            await sell_stock_action(user_id, group_id, stock_id, 10)
         # 再买
         query = await StockDB.buy_stock(
             uid, stock_id, gearing, num, cost
@@ -99,9 +90,12 @@ async def buy_stock_action(user_id: int, group_id: int, stock_id: str, gearing: 
                    f"剩余资金 {have_gold - cost}"
 
 
-# 上海深圳股票有涨跌停
-def is_a_stock(stock_id):
-    return stock_id.startswith("sh") or stock_id.startswith("sz")
+# 快速清仓指令
+async def fast_clear_stock(price, group_id, stock, user_id):
+    await stock.delete()
+    v = round(get_total_value(price, stock), 0)
+    await BagUser.add_gold(user_id, group_id, v)
+    return v
 
 
 async def sell_stock_action(user_id: int, group_id: int, stock_id: str, percent: float):
@@ -119,16 +113,21 @@ async def sell_stock_action(user_id: int, group_id: int, stock_id: str, percent:
             return "你还没有买这个股票哦"
         # 跌停的股票不能卖
         if is_a_stock(stock_id):
+            if is_st_stock(name):
+                if float(infolist[5]) > 4.93 and stock.gearing > 0:
+                    return f"{name}看起来跌停了，不能卖哦"
+                if float(infolist[5]) > 4.93 and stock.gearing < 0:
+                    return f"{name}看起来涨停了，不能平仓哦"
             if float(infolist[5]) < -9.9 and stock.gearing > 0:
                 return f"{name}看起来跌停了，不能卖哦"
-            if float(infolist[5]) < -9.9 and stock.gearing < 0:
+            if float(infolist[5]) > 9.9 and stock.gearing < 0:
                 return f"{name}看起来涨停了，不能平仓哦"
         await StockDB.sell_stock(
             uid, stock_id, percent
         )
         if stock.cost <= 0:  # 正常情况不会出现，但是一旦出现需要异常修复
             stock.cost = 1
-        total_value = (stock.number * price - stock.cost) * stock.gearing + stock.cost
+        total_value = get_total_value(price, stock)
         return_money = round(total_value * percent / 10, 0)
         earned_percent = round((total_value - stock.cost) / stock.cost * 100, 2)
         await StockLogDB.sell_stock_log(
@@ -167,41 +166,11 @@ async def sell_stock_action(user_id: int, group_id: int, stock_id: str, percent:
 async def get_stock_list_action(uid: int, group_id: int):
     my_stocks = await StockDB.get_my_stock(f"{uid}:{group_id}")
 
-    def to_txt(stock: StockDB):
-        infolist = get_stock_info(stock.stock_id)
-        price = infolist[3]
-        time = stock.buy_time.strftime("%Y-%m-%d %H:%M:%S")
-        result = {
-            "name": infolist[1],
-            "code": stock.stock_id,
-            "number": round(stock.number / 100, 2),
-            "price_now": price,
-            "price_cost": round(stock.cost / stock.number, 2),
-            "gearing": stock.gearing,
-            "cost": stock.cost,
-            "value": round((stock.number * float(price) - stock.cost) * stock.gearing + stock.cost, 2),
-            "create_time": time
-        }
-        return result
-
-    return [to_txt(stock) for stock in my_stocks]
+    return [to_obj(stock) for stock in my_stocks]
 
 
 async def get_stock_list_action_for_win(uid: int, group_id: int):
     my_stocks = await StockDB.get_my_stock(f"{uid}:{group_id}")
-
-    def to_txt(stock: StockDB):
-        infolist = get_stock_info(stock.stock_id)
-        price = infolist[3]
-        time = stock.buy_time.strftime("%Y-%m-%d %H:%M:%S")
-        return f"{infolist[1]} 代码{stock.stock_id}\n" \
-               f"持仓数 {round(stock.number / 100, 2)}手\n" \
-               f"现价 {price}亓\n" \
-               f"成本 {round(stock.cost / stock.number, 2)}亓\n" \
-               f"⚖比例 {stock.gearing}\n" \
-               f"花费 {stock.cost}金\n" \
-               f"当前价值 {round((stock.number * float(price) - stock.cost) * stock.gearing + stock.cost, 2)}金\n" \
-               f"建仓时间 {time}"
 
     return [to_txt(stock) for stock in my_stocks]
 
@@ -212,3 +181,34 @@ async def force_clear_action(user_id: int, group_id: int):
     for stock in stocks:
         await sell_stock_action(user_id, group_id, stock.stock_id, 10)
     return len(stocks)
+
+
+async def revert_stock_action(user_id: int, group_id: int, stock_id: str):
+    infolist = get_stock_info(stock_id)
+    if len(infolist) <= 7:
+        return f"未找到对应股票，提示：请使用股票代码而不是名字"
+    price = float(infolist[3])
+    name = infolist[1]
+    lock = asyncio.Lock()
+    # 担心遇到线程问题，加了把锁（不知道有没有用）
+    async with lock:
+        uid = f"{user_id}:{group_id}"
+        stock = await StockDB.get_stock(uid, stock_id)
+        if not stock:
+            return f"你还没买{name}(当前价格:{price})呢！"
+        gearing = -stock.gearing
+        if is_a_stock(stock_id):
+            if is_st_stock(name):
+                if float(infolist[5]) > 4.93 or float(infolist[5]) < -4.93:
+                    return f"该功能在涨跌停时关闭！"
+
+            if float(infolist[5]) > 9.9 or float(infolist[5]) < -9.9:
+                return f"该功能在涨跌停时关闭！"
+
+        total_value = await fast_clear_stock(price, group_id, stock, user_id)
+        await buy_stock_action(user_id, group_id, stock_id, gearing, total_value, price)
+    return f"""反转{name}仓位成功！
+当前股票价格{price}
+当前杠杆{gearing}
+当前仓位价值{total_value}
+"""

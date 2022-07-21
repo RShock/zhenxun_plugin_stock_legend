@@ -105,16 +105,19 @@ class StockDB(db.Model):
             logger.info(f"单个查询股票数据库问题 {type(e)}: {e}")
 
 
-    # 返回值是应该给的钱
     @classmethod
     async def clear_stock_by_id(
             cls,
             uid: str,
+            stock_id: str
     ) -> None:
-        return None
+        try:
+            async with db.transaction():
+                return await StockDB.delete.where((StockDB.uid == uid) & (StockDB.stock_id == stock_id)).gino.status()
+        except Exception as e:
+            logger.info(f"删除指定股票问题 {type(e)}: {e}")
 
 
-    # 返回值是应该给的钱
     @classmethod
     async def get_stocks_by_uid(
             cls,
