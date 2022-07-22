@@ -62,7 +62,7 @@ def to_obj(stock: StockDB):
             "price_now": "---",
             "price_cost": "---",
             "gearing": "---",
-            "cost": round(stock.cost),
+            "cost": "---",
             "value": earned,
             "rate": rate,
             "create_time": time
@@ -87,8 +87,7 @@ def to_obj(stock: StockDB):
 def to_txt(stock):
     if stock["name"] == "躺平基金":
         return f"""{stock["name"]}
-花费 {stock["cost"]}金
-当前价值 {stock["value"]}({stock["rate"]})
+价值 {stock["value"]}({stock["rate"]})
 建仓时间 {stock["create_time"]}
 """
     return f"""{stock["name"]} 代码{stock["code"]}
