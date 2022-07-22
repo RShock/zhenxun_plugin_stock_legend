@@ -10,6 +10,7 @@
 v1.7
 * 给小白新增了`躺平基金`，这是一个每持有一天就会指数增长1.5%的基金（小于1天不会赚钱）
 * 参考指令：`买入躺平基金 x` `卖出躺平基金 x` x为仓位或金额，不填为满仓
+* 曾经的windows适配代码`fit=False`代码被移动到了配置文件当中，之前查看持仓存在问题的，需要运行一次新插件后，到配置文件里面配好
 
 v1.6
 * 修正了5个字符的股票（如腾讯:TCEHY）会被当成港股的问题
@@ -88,8 +89,7 @@ v1.2
 该插件与赛马插件都需要`nonebot_html_render`插件，之前配过赛马的用起来会比较轻松。
 这个插件在windows系统下运行时可能有一些问题。
 
-如果你在win下运行`我的持仓`指令出现错误（注意，如果仅仅是插件无法安装，和这个无关），请将`__init__.py`中179行附近的`fit = False`
-改成`fit = True`，系统会尝试使用另一套代码输出持仓
+如果运行`我的持仓`指令出现错误（注意，如果仅仅是插件无法安装，和这个无关），请将插件里的win_fit配置改成true
 
 将[nonebot_html_render](https://github.com/kexue-z/nonebot-plugin-htmlrender/tree/master/nonebot_plugin_htmlrender)
 放置到真寻的extensive_plugins里（本插件与其同级），然后可能还需要安装一点依赖就可以运行了

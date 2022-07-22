@@ -80,6 +80,11 @@ __plugin_configs__ = {
         "help": "躺平基金每日收益",
         "default_value": 0.015,
     },
+    "WIN_FIT": {
+        "value": False,
+        "help": "如果我的持仓功能报错，且看了issue还是改不好，就把这个改成true",
+        "default_value": False,
+    }
 }
 
 buy_stock = on_command("买股票", aliases={"买入", "建仓", "买入股票"}, priority=5, block=True)
@@ -89,8 +94,6 @@ clear_stock = on_command("强制清仓", priority=5, permission=SUPERUSER, block
 look_stock = on_command("查看持仓", aliases={"偷看持仓"}, priority=5, block=True)
 revert_stock = on_command("反转持仓", priority=5, block=True)
 help_stock = on_command("关于股海风云", priority=5, block=True)
-
-fit = False  # win适配
 
 
 @buy_stock.handle()
@@ -182,10 +185,9 @@ async def _(event: MessageEvent, bot: Bot, state: T_State, arg: Message = Comman
     if not isinstance(event, GroupMessageEvent):
         await buy_stock.finish("这个游戏只能在群里玩哦")
 
-    if fit:
-        if platform.system().lower() == 'windows':
-            my_stocks = await get_stock_list_action_for_win(event.user_id, event.group_id)
-            await send_forward_msg_group(bot, event, "真寻炒股小助手", my_stocks if my_stocks else ["你还什么都没买呢！"])
+    if Config.get_config("stock_legend", "WIN_FIT", False):
+        my_stocks = await get_stock_list_action_for_win(event.user_id, event.group_id)
+        await send_forward_msg_group(bot, event, "真寻炒股小助手", my_stocks if my_stocks else ["你还什么都没买呢！"])
     else:
         my_stocks = await get_stock_list_action(event.user_id, event.group_id)
         if not my_stocks:
@@ -207,10 +209,9 @@ async def _(event: MessageEvent, bot: Bot, args: Message = CommandArg(), arg: Me
     if not look_qq:
         look_qq = event.user_id
 
-    if fit:
-        if platform.system().lower() == 'windows':
-            my_stocks = await get_stock_list_action_for_win(event.user_id, event.group_id)
-            await send_forward_msg_group(bot, event, "真寻炒股小助手", my_stocks if my_stocks else ["仓位是空的"])
+    if Config.get_config("stock_legend", "WIN_FIT", False):
+        my_stocks = await get_stock_list_action_for_win(event.user_id, event.group_id)
+        await send_forward_msg_group(bot, event, "真寻炒股小助手", my_stocks if my_stocks else ["仓位是空的"])
     else:
         my_stocks = await get_stock_list_action(look_qq, event.group_id)
         if not my_stocks:

@@ -57,11 +57,11 @@ def to_obj(stock: StockDB):
         rate = f"📈+{rate}%" if rate >= 0 else f"📉-{rate}%"
         return {
             "name": infolist[1],
-            "code": "———",
-            "number": "———",
-            "price_now": "———",
-            "price_cost": "———",
-            "gearing": "———",
+            "code": "---",
+            "number": "---",
+            "price_now": "---",
+            "price_cost": "---",
+            "gearing": "---",
             "cost": round(stock.cost),
             "value": earned,
             "rate": rate,
@@ -85,6 +85,12 @@ def to_obj(stock: StockDB):
 
 
 def to_txt(stock):
+    if stock["name"] == "躺平基金":
+        return f"""{stock["name"]}
+花费 {stock["cost"]}金
+当前价值 {stock["value"]}({stock["rate"]})
+建仓时间 {stock["create_time"]}
+"""
     return f"""{stock["name"]} 代码{stock["code"]}
 持仓数 {stock["number"]}手
 现价 {stock["price_now"]}亓
