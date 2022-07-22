@@ -4,6 +4,12 @@ import urllib.request
 from nonebot.adapters.onebot.v11 import Bot, GroupMessageEvent
 from rfc3986.compat import to_str
 
+from configs.config import Config
+from configs.path_config import IMAGE_PATH
+from .stock_model import StockDB
+from services import logger
+from utils.http_utils import AsyncPlaywright
+
 
 # 股票名称: infolist[1]
 # 股票代码: infolist[2]
@@ -12,15 +18,13 @@ from rfc3986.compat import to_str
 # 涨   跌%: infolist[5],'%'
 # 成交量(手):infolist[6]
 # 成交额(万):infolist[7]
-from configs.path_config import IMAGE_PATH
-from extensive_plugin.stock_legend.stock_model import StockDB
-from services import logger
-from utils.http_utils import AsyncPlaywright
-
-
 # 第一个参数是股票原始ID,第二个是加工后的（增加了2个字母的前缀）
 # 百度股市通能获取所有截图
-def get_stock_info(num) -> list:
+def get_stock_info(num: str) -> list:
+    if num == '躺平基金':
+        return ['躺平基金', '躺平基金', 1, 1, 1, 1, 1, 1]
+    if not num.isascii() or not num.isprintable():
+        return []
     f = urllib.request.urlopen('http://qt.gtimg.cn/q=s_' + to_str(num))
     # return like: v_s_sz000858="51~五 粮 液~000858~18.10~0.01~0.06~94583~17065~~687.07";
     strGB = f.readline().decode('gb2312')
@@ -47,32 +51,48 @@ def to_obj(stock: StockDB):
     infolist = get_stock_info(stock.stock_id)
     price = infolist[3]
     time = stock.buy_time.strftime("%Y-%m-%d %H:%M:%S")
-    result = {
+    if stock.stock_id == '躺平基金':
+        _, rate, earned = get_tang_ping_earned(stock, 10)
+        rate = round(rate - 1, 2)
+        rate = f"📈+{rate}%" if rate >= 0 else f"📉-{rate}%"
+        return {
+            "name": infolist[1],
+            "code": "———",
+            "number": "———",
+            "price_now": "———",
+            "price_cost": "———",
+            "gearing": "———",
+            "cost": round(stock.cost),
+            "value": earned,
+            "rate": rate,
+            "create_time": time
+        }
+    value = round((stock.number * float(price) - stock.cost) * stock.gearing + stock.cost, 2)
+    rate = round(value / stock.cost - 1, 2)
+    rate = f"📈+{rate}%" if rate >= 0 else f"📉-{rate}%"
+    return {
         "name": infolist[1],
         "code": stock.stock_id,
         "number": round(stock.number / 100, 2),
         "price_now": price,
         "price_cost": round(stock.cost / stock.number, 2),
         "gearing": stock.gearing,
-        "cost": stock.cost,
-        "value": round((stock.number * float(price) - stock.cost) * stock.gearing + stock.cost, 2),
+        "cost": round(stock.cost),
+        "value": value,
+        "rate": rate,
         "create_time": time
     }
-    return result
 
 
-def to_txt(stock: StockDB):
-    infolist = get_stock_info(stock.stock_id)
-    price = infolist[3]
-    time = stock.buy_time.strftime("%Y-%m-%d %H:%M:%S")
-    return f"{infolist[1]} 代码{stock.stock_id}\n" \
-           f"持仓数 {round(stock.number / 100, 2)}手\n" \
-           f"现价 {price}亓\n" \
-           f"成本 {round(stock.cost / stock.number, 2)}亓\n" \
-           f"⚖比例 {stock.gearing}\n" \
-           f"花费 {stock.cost}金\n" \
-           f"当前价值 {round((stock.number * float(price) - stock.cost) * stock.gearing + stock.cost, 2)}金\n" \
-           f"建仓时间 {time}"
+def to_txt(stock):
+    return f"""{stock["name"]} 代码{stock["code"]}
+持仓数 {stock["number"]}手
+现价 {stock["price_now"]}亓
+成本 {stock["price_cost"]}亓
+⚖比例 {stock["gearing"]}
+花费 {stock["cost"]}金
+当前价值 {stock["value"]}({stock["rate"]})
+建仓时间 {stock["create_time"]}"""
 
 
 async def get_stock_img(origin_stock_id: str, stock_id: str, is_long: bool = False):
@@ -113,6 +133,7 @@ async def send_forward_msg_group(
     @param stocks: 股票信息
     @return:
     """
+
     def to_json(stock):
         return {"type": "node", "data": {"name": name, "uin": bot.self_id, "content": stock}}
 
@@ -150,7 +171,7 @@ def fill_stock_id(stock_id: str) -> str:
     if stock_id.startswith("sh") or stock_id.startswith("sz") or stock_id.startswith("hk") \
             or stock_id.startswith("us") or stock_id.startswith("jj"):
         return stock_id
-    if len(stock_id) == 4 and stock_id.isdigit():    # 港股
+    if len(stock_id) == 4 and stock_id.isdigit():  # 港股
         return "hk0" + stock_id
     if len(stock_id) == 5 and stock_id.isdigit():  # 港股
         return "hk" + stock_id
@@ -163,3 +184,10 @@ def fill_stock_id(stock_id: str) -> str:
         return "bj" + stock_id
     # 其他一律当作美股
     return "us" + stock_id
+
+
+def get_tang_ping_earned(stock: StockDB, percent: float) -> (int, float, int):
+    day = (time.time() - time.mktime(stock.buy_time.timetuple())) // 60 // 60 // 24
+    tang_ping = float(Config.get_config("stock_legend", "TANG_PING", 5))
+    rate = ((1 + tang_ping) ** day)  # 翻倍数
+    return day, rate, round(stock.cost * rate * percent / 10)

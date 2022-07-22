@@ -16,7 +16,9 @@ from .data_source import (
     get_stock_list_action,
     force_clear_action,
     get_stock_list_action_for_win,
-    revert_stock_action
+    revert_stock_action,
+    buy_lazy_stock_action,
+    sell_lazy_stock_action
 )
 from .utils import is_a_stock, get_stock_img, send_forward_msg_group, convert_stocks_to_md_table, fill_stock_id
 
@@ -24,30 +26,40 @@ __zx_plugin_name__ = "股海风云"
 __plugin_usage__ = """
 usage：
     简单股市小游戏，T+0 可做空 保证金无限 最高10倍杠杆 0手续费
-    如果你是新手，不需要在意细节，可以从入门的股票简单的玩
+
     指令：
     买股票+代码+金额+杠杆倍数(可不填) 买入股票 例：买股票 600888 10000  (买入10000金币的仓位)
-    卖股票+代码+仓位百分制 卖出股票 例：卖股票 600888 10 (卖出10层仓位)
+    卖股票+代码+仓位百分制 卖出股票 例：卖股票 600888 10 (卖出10层仓位，全卖可以省略这个参数)
+        也支持使用仓位来买股票，如果什么都不填（比如只发送‘买股票600888’）会默认使用满仓满杠杆
+        不指定杠杆都会默认加满杠杆！
     我的持仓
     查看持仓+atQQ 偷看别人的持仓
     反转持仓+股票代码 短线快捷指令，不卖出的情况下快速实现多转空 空转多
     关于股海风云 可以看看这个插件有没有更新，会发一个github链接，当心风控哦
     ————————————————
-     如果要买基金，为防止混淆，需要在基金前面加上"jj" 
+    Q: 如何买基金
+    A: 如果要买基金，为防止混淆，需要在基金前面加上"jj" 
      例：邯钢转债(110001) 易方达平稳增长混合(jj110001)
+         如果你是新手，不需要在意细节，可以从入门的股票简单的玩
+         
+    Q: 杠杆是什么？
+    A: 简单理解为加倍和超级加倍即可
+         杠杆可以是负数（做空）
+         如果买股票时忘记输入杠杆也没关系，可以再买一次来修改杠杆
      
-     杠杆是什么？
-     简单理解为加倍和超级加倍即可
-     杠杆可以是负数（做空）
-     如果买股票时忘记输入杠杆也没关系，可以再买一次来修改杠杆
-     
-     支持股票类型：港股 美股 A股 基金
-     注意：该游戏不会计算分红
+    Q: 支持股票类型？
+    A: 港股 美股 A股 基金
+    
+    Q: 不支持的东西？
+    A: 分红 挂单
+    
+    Q: 我是超级新手，怎么玩？
+    A: 可以先输入‘买入躺平基金’
     ————————————————
     强制清仓+qq号  管理专用指令，爆仓人不愿意清仓就对他使用这个吧
 """.strip()
 __plugin_des__ = "谁才是股市传奇？"
-__plugin_type__ = ("群内小游戏", )
+__plugin_type__ = ("群内小游戏",)
 __plugin_cmd__ = ["买股票 代码 金额]", "卖股票 代码 仓位（十分制）", "我的持仓", "强制清仓"]
 __plugin_version__ = 1.6
 __plugin_author__ = "XiaoR"
@@ -62,7 +74,12 @@ __plugin_configs__ = {
         "value": 5,
         "help": "最大杠杆比率",
         "default_value": 5,
-    }
+    },
+    "TANG_PING": {
+        "value": 0.015,
+        "help": "躺平基金每日收益",
+        "default_value": 0.015,
+    },
 }
 
 buy_stock = on_command("买股票", aliases={"买入", "建仓", "买入股票"}, priority=5, block=True)
@@ -84,6 +101,9 @@ async def _(event: MessageEvent, arg: Message = CommandArg()):
     if len(msg) < 1:
         await buy_stock.finish(MessageSegment.image(await text_to_pic(
             f"格式错误，请输入\n买股票 股票代码 金额 杠杆层数(可选)\n如 买股票 600888 1000 5", width=300)))
+    if msg[0] == '躺平' or msg[0] == '躺平基金':  # 买入躺平基金的特殊逻辑
+        await buy_lazy_handle(buy_stock, msg, event)
+        return
     await buy_handle(buy_stock, msg, event)
 
 
@@ -104,7 +124,7 @@ async def buy_handle(bot, msg, event):
     if cost < 0:
         if cost < -max_gearing:
             await bot.finish(MessageSegment.image(await text_to_pic(f"想做空的话\n请使用负数的杠杆率哦", width=300)))
-        else:   # 这个人输入了买股票xxxx -10 (-10应该是杠杆倍率而不是cost)
+        else:  # 这个人输入了买股票xxxx -10 (-10应该是杠杆倍率而不是cost)
             gearing = cost
             cost = 10
     if len(msg) == 3:
@@ -148,6 +168,9 @@ async def _(
         percent = 10
     if percent <= 0:
         await sell_stock.finish("卖的仓位太低了！")
+    if msg[0] == '躺平' or msg[0] == '躺平基金':  # 卖出躺平基金的特殊逻辑
+        await sell_lazy_handle(buy_stock, msg, event)
+        return
     result = await sell_stock_action(event.user_id, event.group_id, stock_id, percent)
     await sell_stock.send(MessageSegment.image(await text_to_pic(result, width=300)))
     origin_stock_id = stock_id[2:]
@@ -229,5 +252,19 @@ async def _():
     await help_stock.finish(
         """作者：小r
 说明：这个插件可以帮多年后的你省很多钱！练习到每天盈利5%+就可以去玩真正的股市了
-版本：v1.6
+版本：v1.7
 查看是否有更新：https://github.com/RShock/zhenxun_plugin_stock_legend""")
+
+
+# 躺平基金是给不会炒股的人(以及周六日)玩的基金，每天收益为1.5%(默认)
+# 虽然看起来很高但是实际上30天也就1.56倍，可以接受
+async def buy_lazy_handle(bot, msg, event) -> str:
+    cost = 10 if len(msg) <= 1 else float(msg[1])
+    await bot.finish(MessageSegment.image(
+        await text_to_pic(
+            await buy_lazy_stock_action(event.user_id, event.group_id, cost), width=300)))
+
+
+async def sell_lazy_handle(bot, msg, event) -> str:
+    percent = 10 if len(msg) <= 1 else float(msg[1])
+    await bot.finish(await sell_lazy_stock_action(event.user_id, event.group_id, percent))

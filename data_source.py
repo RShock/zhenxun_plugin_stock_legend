@@ -4,14 +4,13 @@ from models.bag_user import BagUser
 from .stock_model import StockDB
 from .stock_log_model import StockLogDB
 from configs.config import Config
-from .utils import get_stock_info, get_total_value, to_obj, to_txt, is_a_stock, is_st_stock
+from .utils import get_stock_info, get_total_value, to_obj, to_txt, is_a_stock, is_st_stock, get_tang_ping_earned
 
 
 async def buy_stock_action(user_id: int, group_id: int, stock_id: str, gearing: float, cost: int,
                            force_price: float = None) -> str:
     infolist = get_stock_info(stock_id)
     if len(infolist) <= 7:
-
         return f"未找到对应股票，提示：请使用股票代码而不是名字"
     if force_price:
         price = force_price
@@ -98,11 +97,15 @@ async def fast_clear_stock(price, group_id, stock, user_id):
     return v
 
 
-async def sell_stock_action(user_id: int, group_id: int, stock_id: str, percent: float):
+async def sell_stock_action(user_id: int, group_id: int, stock_id: str, percent: float,
+                            force_price: float = None):
     infolist = get_stock_info(stock_id)
     if len(infolist) <= 7:
         return f"未找到对应股票，提示：请使用股票代码而不是名字"
-    price = float(infolist[3])
+    if force_price:
+        price = force_price
+    else:
+        price = float(infolist[3])
     name = infolist[1]
     uid = f"{user_id}:{group_id}"
     lock = asyncio.Lock()
@@ -172,7 +175,7 @@ async def get_stock_list_action(uid: int, group_id: int):
 async def get_stock_list_action_for_win(uid: int, group_id: int):
     my_stocks = await StockDB.get_my_stock(f"{uid}:{group_id}")
 
-    return [to_txt(stock) for stock in my_stocks]
+    return [to_txt(to_obj(stock)) for stock in my_stocks]
 
 
 async def force_clear_action(user_id: int, group_id: int):
@@ -212,3 +215,39 @@ async def revert_stock_action(user_id: int, group_id: int, stock_id: str):
 当前杠杆{gearing}
 当前仓位价值{total_value}
 """
+
+
+async def buy_lazy_stock_action(user_id: int, group_id: int, cost: float):
+    lock = asyncio.Lock()
+    # 担心遇到线程问题，加了把锁（不知道有没有用）
+    async with lock:
+        have_gold = await BagUser.get_gold(user_id, group_id)
+        if have_gold <= 0:
+            return f"虽然你很想躺平，但是你没有足够的钱"
+        if cost <= 0:
+            return f"买入数量必须是正数哦(0-10:仓位 10+:价格)"
+        cost = cost if cost > 10 else round(have_gold * cost / 10, 0)
+        if cost <= 0:
+            return f"虽然你很想躺平，但是你没有足够的钱"
+
+        uid = f"{user_id}:{group_id}"
+        await StockDB.buy_stock(uid, "躺平基金", 1, cost, cost)
+        return f"欢迎认购躺平基金！您认购了💵{cost}的躺平基金，每待满一天就会获得1.5%的收益！一定要待满才有哦"
+
+
+async def sell_lazy_stock_action(user_id: int, group_id: int, percent: float):
+    lock = asyncio.Lock()
+    # 担心遇到线程问题，加了把锁（不知道有没有用）
+    async with lock:
+        uid = f"{user_id}:{group_id}"
+        stock = await StockDB.get_stock(uid, "躺平基金")
+        if not stock:
+            return f"你之前不在躺平哦"
+        day, rate, earned = get_tang_ping_earned(stock, percent)
+        await stock.sell_stock(uid, "躺平基金", percent)
+        await BagUser.add_gold(user_id, group_id, earned)
+        msg = f"坚持持有了{day}天所以翻了{rate}倍！" if day > 0 else "没有坚持持有，只能把钱原路退给你了！"
+        return f"""卖出了{percent}成仓位的躺平基金
+{msg}
+得到了{earned}块钱
+        """.strip()
