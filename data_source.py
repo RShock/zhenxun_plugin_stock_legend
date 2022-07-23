@@ -235,6 +235,8 @@ async def buy_lazy_stock_action(user_id: int, group_id: int, cost: float):
         if stock:
             _, scale, _ = get_tang_ping_earned(stock, 10)
             real_cost = cost/scale
+        else:
+            real_cost = cost
         await BagUser.spend_gold(user_id, group_id, cost)
         await StockDB.buy_stock(uid, "躺平基金", 1, real_cost, real_cost)
         return f"欢迎认购躺平基金！您认购了💵{cost}的躺平基金，每待满一天就会获得1.5%的收益！一定要待满才有哦"
