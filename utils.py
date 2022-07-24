@@ -68,7 +68,7 @@ def to_obj(stock: StockDB):
             "create_time": time
         }
     value = round((stock.number * float(price) - stock.cost) * stock.gearing + stock.cost, 2)
-    rate = round(value * 100 / stock.cost - 1, 2)
+    rate = round(value * 100 / stock.cost - 100, 2)
     rate = f"📈+{rate}%" if rate >= 0 else f"📉-{rate}%"
     return {
         "name": infolist[1],
