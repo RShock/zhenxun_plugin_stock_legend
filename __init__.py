@@ -54,14 +54,14 @@ usage：
     A: 分红 挂单
     
     Q: 我是超级新手，怎么玩？
-    A: 可以先输入‘买入躺平基金’
+    A: 可以先输入‘买入躺平基金 x’ x为仓位数 最高10 可不填
     ————————————————
     强制清仓+qq号  管理专用指令，爆仓人不愿意清仓就对他使用这个吧
 """.strip()
 __plugin_des__ = "谁才是股市传奇？"
 __plugin_type__ = ("群内小游戏",)
 __plugin_cmd__ = ["买股票 代码 金额]", "卖股票 代码 仓位（十分制）", "我的持仓", "强制清仓"]
-__plugin_version__ = 1.8
+__plugin_version__ = 1.9
 __plugin_author__ = "XiaoR"
 __plugin_settings__ = {
     "level": 5,
@@ -172,7 +172,7 @@ async def _(
     if percent <= 0:
         await sell_stock.finish("卖的仓位太低了！")
     if msg[0] == '躺平' or msg[0] == '躺平基金':  # 卖出躺平基金的特殊逻辑
-        await sell_lazy_handle(buy_stock, msg, event)
+        await sell_lazy_handle(buy_stock, percent, event)
         return
     result = await sell_stock_action(event.user_id, event.group_id, stock_id, percent)
     await sell_stock.send(MessageSegment.image(await text_to_pic(result, width=300)))
@@ -218,7 +218,7 @@ async def _(event: MessageEvent, bot: Bot, args: Message = CommandArg(), arg: Me
             await sell_stock.finish(MessageSegment.image(await text_to_pic("仓位是空的", width=300)))
         txt = convert_stocks_to_md_table(my_stocks)
         logger.info(txt)
-        await sell_stock.finish(MessageSegment.image(await md_to_pic(f"{txt}", width=1000)))
+        await sell_stock.finish(MessageSegment.image(await md_to_pic(f"{txt}", width=1200)))
 
 
 # 这是一个测试用管理员指令，不能滥用
@@ -253,7 +253,7 @@ async def _():
     await help_stock.finish(
         """作者：小r
 说明：这个插件可以帮多年后的你省很多钱！练习到每天盈利5%+就可以去玩真正的股市了
-版本：v1.8
+版本：v1.9
 查看是否有更新：https://github.com/RShock/zhenxun_plugin_stock_legend""")
 
 
@@ -266,6 +266,5 @@ async def buy_lazy_handle(bot, msg, event) -> str:
             await buy_lazy_stock_action(event.user_id, event.group_id, cost), width=300)))
 
 
-async def sell_lazy_handle(bot, msg, event) -> str:
-    percent = 10 if len(msg) <= 1 else float(msg[1])
+async def sell_lazy_handle(bot, percent, event) -> str:
     await bot.finish(await sell_lazy_stock_action(event.user_id, event.group_id, percent))

@@ -238,7 +238,7 @@ async def buy_lazy_stock_action(user_id: int, group_id: int, cost: float):
         else:
             real_cost = cost
         await BagUser.spend_gold(user_id, group_id, cost)
-        await StockDB.buy_stock(uid, "躺平基金", 1, real_cost, real_cost)
+        await StockDB.buy_stock(uid, "躺平基金", 1, real_cost, cost)
         return f"欢迎认购躺平基金！您认购了💵{cost}的躺平基金，每待满一天就会获得1.5%的收益！一定要待满才有哦"
 
 
@@ -253,7 +253,7 @@ async def sell_lazy_stock_action(user_id: int, group_id: int, percent: float):
         day, rate, earned = get_tang_ping_earned(stock, percent)
         await stock.sell_stock(uid, "躺平基金", percent)
         await BagUser.add_gold(user_id, group_id, earned)
-        msg = f"坚持持有了{day}天所以翻了{rate}倍！" if day > 0 else "没有坚持持有，只能把钱原路退给你了！"
+        msg = f"坚持持有了{day}天所以翻了{round(rate,2)}倍！(该倍率指最早一批买入资金的倍率）" if day > 0 else "没有坚持持有，只能把钱原路退给你了！"
         return f"""卖出了{percent}成仓位的躺平基金
 {msg}
 得到了{earned}块钱

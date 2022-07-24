@@ -53,16 +53,16 @@ def to_obj(stock: StockDB):
     time = stock.buy_time.strftime("%Y-%m-%d %H:%M:%S")
     if stock.stock_id == '躺平基金':
         _, rate, earned = get_tang_ping_earned(stock, 10)
-        rate = round(rate - 1, 2)
+        rate = round(earned/stock.cost, 2)
         rate = f"📈+{rate}%" if rate >= 0 else f"📉-{rate}%"
         return {
             "name": infolist[1],
             "code": "---",
-            "number": "---",
+            "number": round(stock.number,2),
             "price_now": "---",
             "price_cost": "---",
             "gearing": "---",
-            "cost": "---",
+            "cost": round(stock.cost),
             "value": earned,
             "rate": rate,
             "create_time": time
@@ -87,6 +87,8 @@ def to_obj(stock: StockDB):
 def to_txt(stock):
     if stock["name"] == "躺平基金":
         return f"""{stock["name"]}
+持仓数 {stock["number"]}手
+花费 {stock["cost"]}金
 价值 {stock["value"]}({stock["rate"]})
 建仓时间 {stock["create_time"]}
 """
@@ -158,8 +160,9 @@ def convert_stocks_to_md_table(stocks):
             s['value'] = f"<font color=\"#dd0000\">{s['value']}</font>"
         elif s['value'] < s['cost']:
             s['value'] = f"<font color=\"#00dd00\">{s['value']}</font>"
+
         return f"|{s['name']}|{s['code']}|{s['number']}|{s['price_now']}|{s['price_cost']}|{s['gearing']}" \
-               f"|{s['cost']}|{s['value']}|{s['create_time']}|\n"
+               f"|{s['cost']}|{s['value']}({s['rate']})|{s['create_time']}|\n"
 
     for stock in stocks:
         result += to_md(stock)
@@ -195,4 +198,4 @@ def get_tang_ping_earned(stock: StockDB, percent: float) -> (int, float, int):
     day = (time.time() - time.mktime(stock.buy_time.timetuple())) // 60 // 60 // 24
     tang_ping = float(Config.get_config("stock_legend", "TANG_PING", 5))
     rate = ((1 + tang_ping) ** day)  # 翻倍数
-    return day, rate, round(stock.cost * rate * percent / 10)
+    return day, rate, round(stock.number * rate * percent / 10)
