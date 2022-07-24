@@ -53,7 +53,7 @@ def to_obj(stock: StockDB):
     time = stock.buy_time.strftime("%Y-%m-%d %H:%M:%S")
     if stock.stock_id == '躺平基金':
         _, rate, earned = get_tang_ping_earned(stock, 10)
-        rate = round(earned / stock.cost - 1, 2)
+        rate = round(earned * 100 / stock.cost - 1, 2)
         rate = f"📈+{rate}%" if rate >= 0 else f"📉-{rate}%"
         return {
             "name": infolist[1],
@@ -68,7 +68,7 @@ def to_obj(stock: StockDB):
             "create_time": time
         }
     value = round((stock.number * float(price) - stock.cost) * stock.gearing + stock.cost, 2)
-    rate = round(value / stock.cost - 1, 2)
+    rate = round(value * 100 / stock.cost - 1, 2)
     rate = f"📈+{rate}%" if rate >= 0 else f"📉-{rate}%"
     return {
         "name": infolist[1],
