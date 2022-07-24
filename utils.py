@@ -54,7 +54,7 @@ def to_obj(stock: StockDB):
     if stock.stock_id == '躺平基金':
         _, rate, earned = get_tang_ping_earned(stock, 10)
         rate = round(earned * 100 / stock.cost - 1, 2)
-        rate = f"📈+{rate}%" if rate >= 0 else f"📉-{rate}%"
+        rate = f"📈+{rate}%" if rate >= 0 else f"📉{rate}%"
         return {
             "name": infolist[1],
             "code": "---",
