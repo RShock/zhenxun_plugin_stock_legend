@@ -27,9 +27,9 @@ def get_stock_info(num: str) -> list:
         return []
     f = urllib.request.urlopen('http://qt.gtimg.cn/q=s_' + to_str(num))
     # return like: v_s_sz000858="51~五 粮 液~000858~18.10~0.01~0.06~94583~17065~~687.07";
-    strGB = f.readline().decode('gb2312')
+    strGB:str = f.readline().decode('gb2312')
     f.close()
-    infolist = strGB[14:-3]
+    infolist = strGB[strGB.find("\""):-3]
     return infolist.split('~')
 
 
@@ -68,7 +68,7 @@ def to_obj(stock: StockDB):
             "create_time": time
         }
     value = round((stock.number * float(price) - stock.cost) * stock.gearing + stock.cost, 2)
-    rate = round(value * 100 / stock.cost - 100, 2)
+    rate = round(value * 100 / stock.cost - 1, 2)
     rate = f"📈+{rate}%" if rate >= 0 else f"📉-{rate}%"
     return {
         "name": infolist[1],

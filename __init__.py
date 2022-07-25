@@ -61,7 +61,7 @@ usage：
 __plugin_des__ = "谁才是股市传奇？"
 __plugin_type__ = ("群内小游戏",)
 __plugin_cmd__ = ["买股票 代码 金额]", "卖股票 代码 仓位（十分制）", "我的持仓", "强制清仓"]
-__plugin_version__ = 1.9
+__plugin_version__ = 1.95
 __plugin_author__ = "XiaoR"
 __plugin_settings__ = {
     "level": 5,
@@ -253,7 +253,7 @@ async def _():
     await help_stock.finish(
         """作者：小r
 说明：这个插件可以帮多年后的你省很多钱！练习到每天盈利5%+就可以去玩真正的股市了
-版本：v1.9
+版本：v1.95
 查看是否有更新：https://github.com/RShock/zhenxun_plugin_stock_legend""")
 
 

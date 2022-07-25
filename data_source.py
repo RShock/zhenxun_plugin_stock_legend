@@ -5,6 +5,7 @@ from .stock_model import StockDB
 from .stock_log_model import StockLogDB
 from configs.config import Config
 from .utils import get_stock_info, get_total_value, to_obj, to_txt, is_a_stock, is_st_stock, get_tang_ping_earned
+from services.log import logger
 
 
 async def buy_stock_action(user_id: int, group_id: int, stock_id: str, gearing: float, cost: int,
@@ -102,6 +103,8 @@ async def sell_stock_action(user_id: int, group_id: int, stock_id: str, percent:
     infolist = get_stock_info(stock_id)
     if len(infolist) <= 7:
         return f"未找到对应股票，提示：请使用股票代码而不是名字"
+    logger.info(infolist)
+
     if force_price:
         price = force_price
     else:
