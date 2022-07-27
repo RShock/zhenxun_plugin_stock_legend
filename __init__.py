@@ -218,7 +218,7 @@ async def _(event: MessageEvent, bot: Bot, args: Message = CommandArg(), arg: Me
             await sell_stock.finish(MessageSegment.image(await text_to_pic("仓位是空的", width=300)))
         txt = convert_stocks_to_md_table(my_stocks)
         logger.info(txt)
-        await sell_stock.finish(MessageSegment.image(await md_to_pic(f"{txt}", width=1200)))
+        await sell_stock.finish(MessageSegment.image(await md_to_pic(f"{txt}", width=1200)), at_sender=True)
 
 
 # 这是一个测试用管理员指令，不能滥用
