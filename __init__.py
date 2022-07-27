@@ -91,7 +91,7 @@ buy_stock = on_command("买股票", aliases={"买入", "建仓", "买入股票"}
 sell_stock = on_command("卖股票", aliases={"卖出", "清仓", "平仓", "卖出股票"}, priority=5, block=True)
 my_stock = on_command("我的持仓", aliases={"我的股票", "我的仓位", "我的持股"}, priority=5, block=True)
 clear_stock = on_command("强制清仓", priority=5, permission=SUPERUSER, block=True)
-look_stock = on_command("查看持仓", aliases={"偷看持仓"}, priority=5, block=True)
+look_stock = on_command("查看持仓", aliases={"偷看持仓", "他的持仓"}, priority=5, block=True)
 revert_stock = on_command("反转持仓", priority=5, block=True)
 help_stock = on_command("关于股海风云", priority=5, block=True)
 
@@ -191,10 +191,10 @@ async def _(event: MessageEvent, bot: Bot, state: T_State, arg: Message = Comman
     else:
         my_stocks = await get_stock_list_action(event.user_id, event.group_id)
         if not my_stocks:
-            await sell_stock.finish(MessageSegment.image(await text_to_pic("你还什么都没买呢！", width=300)))
+            await sell_stock.finish(MessageSegment.image(await text_to_pic("你还什么都没买呢！", width=300)), at_sender=True)
         txt = convert_stocks_to_md_table(my_stocks)
         logger.info(txt)
-        await sell_stock.finish(MessageSegment.image(await md_to_pic(f"{txt}", width=1000)))
+        await sell_stock.finish(MessageSegment.image(await md_to_pic(f"{txt}", width=1000)), at_sender=True)
 
 
 @look_stock.handle()
@@ -215,10 +215,10 @@ async def _(event: MessageEvent, bot: Bot, args: Message = CommandArg(), arg: Me
     else:
         my_stocks = await get_stock_list_action(look_qq, event.group_id)
         if not my_stocks:
-            await sell_stock.finish(MessageSegment.image(await text_to_pic("仓位是空的", width=300)))
+            await sell_stock.finish(MessageSegment.image(await text_to_pic("他的仓位是空的", width=300)), at_sender=True)
         txt = convert_stocks_to_md_table(my_stocks)
         logger.info(txt)
-        await sell_stock.finish(MessageSegment.image(await md_to_pic(f"{txt}", width=1200)))
+        await sell_stock.finish(MessageSegment.image(await md_to_pic(f"{txt}", width=1200)), at_sender=True)
 
 
 # 这是一个测试用管理员指令，不能滥用
