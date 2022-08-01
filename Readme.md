@@ -122,17 +122,17 @@ v1.2
 
 * 注意放进去的是链接点进去时看到的子文件夹，不要把整个`nonebot_html_render`项目放进去
 * 我已经把`nonebot_html_render`打包好了，你也可以解压就用
-* 按理说会缺2个依赖：`Jinjia2`和`markdown`，可以先提前装好
+* 按理说会缺2个依赖：`Jinja2`和`markdown`，可以先提前装好
 
 其他安装问题可以去看看[issue](https://github.com/RShock/zhenxun_plugin_stock_legend/issues?q=)
 
 ``` 
 如果你的真寻不基于虚拟环境，应该尝试用这个
-pip3 install Jinjia2
+pip3 install Jinja2
 pip3 install markdown
 
 基于虚拟环境，应该尝试用这个
-poetry add Jinjia2
+poetry add Jinja2
 poetry add markdown
 
 或者都尝试一下
