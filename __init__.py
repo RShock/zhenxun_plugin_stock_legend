@@ -208,7 +208,7 @@ async def _(event: MessageEvent, bot: Bot):
             await sell_stock.finish(await to_pic_msg(f"{username}你还什么都没买呢！", width=300))
         txt = convert_stocks_to_md_table(username, my_stocks)
         logger.info(txt)
-        await sell_stock.finish(MessageSegment.image(await md_to_pic(f"{txt}", width=1000)), at_sender=True)
+        await sell_stock.finish(MessageSegment.image(await md_to_pic(f"{txt}", width=1000)))
 
 
 @look_stock.handle()
@@ -231,7 +231,7 @@ async def _(event: MessageEvent, bot: Bot, args: Message = CommandArg()):
             await sell_stock.finish(await to_pic_msg(f"{username}的仓位是空的", width=300))
         txt = convert_stocks_to_md_table(username, my_stocks)
         logger.info(txt)
-        await sell_stock.finish(MessageSegment.image(await md_to_pic(f"{txt}", width=1200)), at_sender=True)
+        await sell_stock.finish(MessageSegment.image(await md_to_pic(f"{txt}", width=1200)))
 
 
 # 这是一个测试用管理员指令，不能滥用
