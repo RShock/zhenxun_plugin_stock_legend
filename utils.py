@@ -25,14 +25,14 @@ import re
 # 成交额(万):infolist[7]
 # 第一个参数是股票原始ID,第二个是加工后的（增加了2个字母的前缀）
 # 百度股市通能获取所有截图
-def get_stock_info(stock_id: str) -> list:
+async def get_stock_info(stock_id: str) -> list:
     if stock_id == '躺平基金':
         return ['躺平基金', '躺平基金', 1, 1, 1, 1, 1, 1]
     if not stock_id.isascii() or not stock_id.isprintable():
         return []
-    p = re.compile(r'[j|J]\d+')  # 日股代码正则
+    p = re.compile(r'J\d+')  # 日股代码正则
     if p.match(stock_id):
-        return get_jp_stock_info(stock_id)
+        return await get_jp_stock_info(stock_id)
     f = urllib.request.urlopen('http://qt.gtimg.cn/q=s_' + to_str(stock_id))
     # return like: v_s_sz000858="51~五 粮 液~000858~18.10~0.01~0.06~94583~17065~~687.07";
     strGB: str = f.readline().decode('gb2312')
@@ -41,16 +41,35 @@ def get_stock_info(stock_id: str) -> list:
     return infolist.split('~')
 
 
-def get_jp_stock_info(jp_stock_id):
-    url = 'https://histock.tw/stock/module/stockdata.aspx?no=J7951'
-    # Request Data
-    data = dict(
-        # 参数
-        no='J7951'
-    )
-    response = requests.post(url, data)
-    print(response)  # 请求状态
-    print(response.content)  # 返回结果
+async def get_jp_stock_info(jp_stock_id):
+    url = f'https://histock.tw/jpstock/{jp_stock_id[1:]}'
+    # async with async_playwright() as pw:
+    #     browser = await pw.chromium.launch(
+    #         headless=True,
+    #     )
+    #     page = await browser.new_page()
+    #     logger.info(url)
+    #     await page.goto(url)
+    #     # page = await page.wait_for_selector(".clr-rd", timeout=10000)
+    #     price = await page.query_selector(".clr-rd")
+    #     name = await page.query_selector(".info-left h3")
+    #     price = await price.inner_text()
+    #     name = await name.inner_text()
+    #     logger.info(price)
+    #     logger.info(name)
+    #     await browser.close()
+    req = urllib.request.Request(url=url,
+                                 headers={
+                                     "referer": 'https://histock.tw/jpstock',
+                                     "user-agent": 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 '
+                                                   '(KHTML, like Gecko) Chrome/103.0.0.0 Safari/537.36'
+                                 })
+    result = urllib.request.urlopen(req).read().decode("utf-8")
+    m = re.search(r'clr-rd">(\d+)<', result)
+    m2 = re.search(r'\s+(.*)</h3>', result)
+    print(m.group(1))
+    print(m2.group(1))
+    return [None, m2.group(1), jp_stock_id, m.group(1), None, None, None, None]
 
 
 # 判断是不是a股，因为上海深圳股票有涨跌停
@@ -67,8 +86,8 @@ def get_total_value(price, stock):
     return (stock.number * price - stock.cost) * stock.gearing + stock.cost
 
 
-def to_obj(stock: StockDB):
-    infolist = get_stock_info(stock.stock_id)
+async def to_obj(stock: StockDB):
+    infolist = await get_stock_info(stock.stock_id)
     price = infolist[3]
     time = stock.buy_time.strftime("%Y-%m-%d %H:%M:%S")
     if stock.stock_id == '躺平基金':
@@ -171,8 +190,8 @@ async def send_forward_msg_group(
 
 
 def convert_stocks_to_md_table(username, stocks):
-    result = f'### {username}的持仓\n'\
-        '|名称|代码|持仓数量|现价|成本|杠杆比例|花费|当前价值|建仓时间|\n' \
+    result = f'### {username}的持仓\n' \
+             '|名称|代码|持仓数量|现价|成本|杠杆比例|花费|当前价值|建仓时间|\n' \
              '| --- | --- | --- | --- | --- | --- | --- | --- | --- |\n'
 
     def to_md(s):
@@ -208,6 +227,8 @@ def fill_stock_id(stock_id: str) -> str:
     @param stock_id: 原始ID
     @return: 补全后的ID
     """
+    if re.fullmatch(r'J\d+', stock_id):  # 日股(如J4080)
+        return stock_id.upper()
     # 玩家手动指定市场
     if stock_id.startswith("sh") or stock_id.startswith("sz") or stock_id.startswith("hk") \
             or stock_id.startswith("us") or stock_id.startswith("jj"):
@@ -246,6 +267,9 @@ async def get_stock_img_v2(origin_stock_id: str, stock_id: str, is_detail: bool 
     elif origin_stock_id == "IXIC":  # 纳斯达克指数 还有很多同类指数实在是搞不过来 建议直接去买对应基金
         url = "https://gushitong.baidu.com/index/us-IXIC"
         tar = ".fac"
+    elif stock_id.startswith('J'):  # 日股
+        url = f"https://histock.tw/jpstock/{stock_id[1:]}"
+        tar = "//div[@class='grid']"
     # 国债r001系列(购买这个系列完全是作弊，不禁止的原因是，希望有人能通过这个游戏学习股市，最后发现这个(直接看这段文字的不算数))
     # 真发现了，可以先约定不许买
     elif origin_stock_id.startswith('13'):

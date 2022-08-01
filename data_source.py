@@ -10,7 +10,7 @@ from services.log import logger
 
 async def buy_stock_action(user_id: int, group_id: int, stock_id: str, gearing: float, cost: int,
                            force_price: float = None) -> str:
-    infolist = get_stock_info(stock_id)
+    infolist = await get_stock_info(stock_id)
     if len(infolist) <= 7:
         return f"未找到对应股票，提示：请使用股票代码而不是名字"
     if force_price:
@@ -100,7 +100,7 @@ async def fast_clear_stock(price, group_id, stock, user_id):
 
 async def sell_stock_action(user_id: int, group_id: int, stock_id: str, percent: float,
                             force_price: float = None):
-    infolist = get_stock_info(stock_id)
+    infolist = await get_stock_info(stock_id)
     if len(infolist) <= 7:
         return f"未找到对应股票，提示：请使用股票代码而不是名字"
     logger.info(infolist)
@@ -172,25 +172,27 @@ async def sell_stock_action(user_id: int, group_id: int, stock_id: str, percent:
 async def get_stock_list_action(uid: int, group_id: int):
     my_stocks = await StockDB.get_my_stock(f"{uid}:{group_id}")
 
-    return [to_obj(stock) for stock in my_stocks]
+    return [await to_obj(stock) for stock in my_stocks]
 
 
 async def get_stock_list_action_for_win(uid: int, group_id: int):
     my_stocks = await StockDB.get_my_stock(f"{uid}:{group_id}")
 
-    return [to_txt(to_obj(stock)) for stock in my_stocks]
+    return [to_txt(await to_obj(stock)) for stock in my_stocks]
 
 
 async def force_clear_action(user_id: int, group_id: int):
     uid = f"{user_id}:{group_id}"
     stocks = await StockDB.get_stocks_by_uid(uid)
+    tmp = ''
     for stock in stocks:
-        await sell_stock_action(user_id, group_id, stock.stock_id, 10)
-    return len(stocks)
+        tmp += await sell_stock_action(user_id, group_id, stock.stock_id, 10)
+        tmp += '\n'
+    return len(stocks), tmp
 
 
 async def revert_stock_action(user_id: int, group_id: int, stock_id: str):
-    infolist = get_stock_info(stock_id)
+    infolist = await get_stock_info(stock_id)
     if len(infolist) <= 7:
         return f"未找到对应股票，提示：请使用股票代码而不是名字"
     price = float(infolist[3])

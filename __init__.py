@@ -37,6 +37,7 @@ usage：
     我的持仓
     查看持仓+atQQ 偷看别人的持仓
     反转持仓+股票代码 短线快捷指令，不卖出的情况下快速实现多转空 空转多
+    清仓 直接把自己所有股票卖完（这个指令还在内测中）
     关于股海风云 可以看看这个插件有没有更新，会发一个github链接，当心风控哦
     ————————————————
     Q: 如何买基金
@@ -69,7 +70,7 @@ usage：
 __plugin_des__ = "谁才是股市传奇？"
 __plugin_type__ = ("群内小游戏",)
 __plugin_cmd__ = ["买股票 代码 金额]", "卖股票 代码 仓位（十分制）", "我的持仓", "强制清仓"]
-__plugin_version__ = 2.0
+__plugin_version__ = 2.1
 __plugin_author__ = "XiaoR"
 __plugin_settings__ = {
     "level": 5,
@@ -101,13 +102,14 @@ __plugin_configs__ = {
 }
 
 buy_stock = on_command("买股票", aliases={"买入", "建仓", "买入股票"}, priority=5, block=True)
-sell_stock = on_command("卖股票", aliases={"卖出", "清仓", "平仓", "卖出股票"}, priority=5, block=True)
+sell_stock = on_command("卖股票", aliases={"卖出", "平仓", "卖出股票"}, priority=5, block=True)
 my_stock = on_command("我的持仓", aliases={"我的股票", "我的仓位", "我的持股"}, priority=5, block=True)
 clear_stock = on_command("强制清仓", priority=5, permission=SUPERUSER, block=True)
 look_stock = on_command("查看持仓", aliases={"偷看持仓", "他的持仓"}, priority=5, block=True)
 revert_stock = on_command("反转持仓", priority=5, block=True)
 help_stock = on_command("关于股海风云", priority=5, block=True)
 query_stock = on_command("查看股票", priority=5, block=True)
+clear_my_stock = on_command("清仓", priority=5, block=True)
 
 
 @buy_stock.handle()
@@ -178,7 +180,7 @@ async def _(
     if len(msg) == 1:
         percent = 10
     else:
-        percent = round(int(msg[1]), 2)
+        percent = round(float(msg[1]), 2)
     if percent > 10:
         await sell_stock.send(await to_pic_msg("不能卖十成以上的仓位哦，已经帮你全卖了"))
         percent = 10
@@ -244,8 +246,17 @@ async def _(event: MessageEvent, arg: Message = CommandArg()):
     msg = arg.extract_plain_text().strip().split()
     if len(msg) < 1:
         await buy_stock.finish(await to_pic_msg("格式错误，请输入强制清仓 qq号"))
-    cnt = await force_clear_action(int(msg[0]), event.group_id)
-    await buy_stock.finish(await to_pic_msg(f"{msg[0]}的{cnt}仓位都被卖了", width=300))
+    cnt, tmp = await force_clear_action(int(msg[0]), event.group_id)
+    await buy_stock.finish(await to_pic_msg(f"{msg[0]}的{cnt}仓位都被卖了:\n{tmp}", width=300))
+
+
+@clear_my_stock.handle()
+async def _(event: MessageEvent):
+    if not isinstance(event, GroupMessageEvent):
+        await clear_stock.finish(await to_pic_msg("这个游戏只能在群里玩哦"))
+
+    cnt, tmp = await force_clear_action(event.user_id, event.group_id)
+    await buy_stock.finish(await to_pic_msg(f"{cnt}个仓位都被卖了:\n{tmp}", width=300))
 
 
 @revert_stock.handle()
@@ -270,7 +281,7 @@ async def _():
     await help_stock.finish(
         """作者：小r
 说明：这个插件可以帮多年后的你省很多钱！练习到每天盈利5%+就可以去玩真正的股市了
-版本：v2.0
+版本：v2.1
 查看是否有更新：https://github.com/RShock/zhenxun_plugin_stock_legend""")
 
 
