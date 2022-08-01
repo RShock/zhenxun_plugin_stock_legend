@@ -1,14 +1,19 @@
 import time
 import urllib.request
+from pathlib import Path
 
 from nonebot.adapters.onebot.v11 import Bot, GroupMessageEvent
+from playwright.async_api import async_playwright
 from rfc3986.compat import to_str
 
 from configs.config import Config
 from configs.path_config import IMAGE_PATH
+from utils.message_builder import image
 from .stock_model import StockDB
 from services import logger
 from utils.http_utils import AsyncPlaywright
+
+import re
 
 
 # 股票名称: infolist[1]
@@ -20,17 +25,32 @@ from utils.http_utils import AsyncPlaywright
 # 成交额(万):infolist[7]
 # 第一个参数是股票原始ID,第二个是加工后的（增加了2个字母的前缀）
 # 百度股市通能获取所有截图
-def get_stock_info(num: str) -> list:
-    if num == '躺平基金':
+def get_stock_info(stock_id: str) -> list:
+    if stock_id == '躺平基金':
         return ['躺平基金', '躺平基金', 1, 1, 1, 1, 1, 1]
-    if not num.isascii() or not num.isprintable():
+    if not stock_id.isascii() or not stock_id.isprintable():
         return []
-    f = urllib.request.urlopen('http://qt.gtimg.cn/q=s_' + to_str(num))
+    p = re.compile(r'[j|J]\d+')  # 日股代码正则
+    if p.match(stock_id):
+        return get_jp_stock_info(stock_id)
+    f = urllib.request.urlopen('http://qt.gtimg.cn/q=s_' + to_str(stock_id))
     # return like: v_s_sz000858="51~五 粮 液~000858~18.10~0.01~0.06~94583~17065~~687.07";
-    strGB:str = f.readline().decode('gb2312')
+    strGB: str = f.readline().decode('gb2312')
     f.close()
     infolist = strGB[strGB.find("\""):-3]
     return infolist.split('~')
+
+
+def get_jp_stock_info(jp_stock_id):
+    url = 'https://histock.tw/stock/module/stockdata.aspx?no=J7951'
+    # Request Data
+    data = dict(
+        # 参数
+        no='J7951'
+    )
+    response = requests.post(url, data)
+    print(response)  # 请求状态
+    print(response.content)  # 返回结果
 
 
 # 判断是不是a股，因为上海深圳股票有涨跌停
@@ -150,9 +170,10 @@ async def send_forward_msg_group(
     )
 
 
-def convert_stocks_to_md_table(stocks):
-    result = "|名称  |代码|持仓数量|现价|成本|杠杆比例|花费|当前价值|建仓时间|\n" \
-             "| --- | --- | --- | --- | --- | --- | --- | --- | --- |\n"
+def convert_stocks_to_md_table(username, stocks):
+    result = f'### {username}的持仓\n'\
+        '|名称|代码|持仓数量|现价|成本|杠杆比例|花费|当前价值|建仓时间|\n' \
+             '| --- | --- | --- | --- | --- | --- | --- | --- | --- |\n'
 
     def to_md(s):
         # 染色
@@ -164,8 +185,20 @@ def convert_stocks_to_md_table(stocks):
         return f"|{s['name']}|{s['code']}|{s['number']}|{s['price_now']}|{s['price_cost']}|{s['gearing']}" \
                f"|{s['cost']}|{s['value']}({s['rate']})|{s['create_time']}|\n"
 
+    total_value = 0
+    total_cost = 0
     for stock in stocks:
+        total_value += float(stock['value'])
+        total_cost += float(stock['cost'])
         result += to_md(stock)
+    dif = round(total_value - total_cost, 1)
+    if dif >= 0:
+        dif = f"<font color=\"#dd0000\">{dif}</font>"
+    else:
+        dif = f"<font color=\"#00dd00\">{dif}</font>"
+    total_value = round(total_value, 2)
+    total_cost = round(total_cost, 2)
+    result += f"|总计||||||{total_cost}|{total_value}|{dif}|"
     return result
 
 
@@ -199,3 +232,52 @@ def get_tang_ping_earned(stock: StockDB, percent: float) -> (int, float, int):
     tang_ping = float(Config.get_config("stock_legend", "TANG_PING", 5))
     rate = ((1 + tang_ping) ** day)  # 翻倍数
     return day, rate, round(stock.number * rate * percent / 10)
+
+
+# 采用东财 图像更专业
+async def get_stock_img_v2(origin_stock_id: str, stock_id: str, is_detail: bool = False):
+    is_fund = False  # 基金特判
+    if len(origin_stock_id) == 5 and origin_stock_id.isdigit():
+        url = f"http://quote.eastmoney.com/hk/{origin_stock_id}.html"
+        tar = "//div[contains(@class,'quote3l')][2]//div[@class='quote3l_c']"
+    elif stock_id.startswith("us"):
+        url = f"http://quote.eastmoney.com/us/{origin_stock_id}.html"
+        tar = "//div[contains(@class,'quote3l')][2]//div[@class='quote3l_c']"
+    elif origin_stock_id == "IXIC":  # 纳斯达克指数 还有很多同类指数实在是搞不过来 建议直接去买对应基金
+        url = "https://gushitong.baidu.com/index/us-IXIC"
+        tar = ".fac"
+    # 国债r001系列(购买这个系列完全是作弊，不禁止的原因是，希望有人能通过这个游戏学习股市，最后发现这个(直接看这段文字的不算数))
+    # 真发现了，可以先约定不许买
+    elif origin_stock_id.startswith('13'):
+        url = f"http://quote.eastmoney.com/bond/{stock_id}.html"
+        tar = "//div[contains(@class,'quote2l_cr2_m')]"
+    elif stock_id.startswith('jj'):  # 基金
+        url = f"https://fund.eastmoney.com/{stock_id[2:]}.html"
+        is_fund = True
+    else:  # 其他ab股
+        url = f"http://quote.eastmoney.com/{stock_id}.html"
+        tar = "//div[@id='js_box']"
+    async with async_playwright() as pw:
+        browser = await pw.chromium.launch(
+            headless=True,
+        )
+
+        page = await browser.new_page()
+        logger.info(url)
+        await page.goto(url)
+
+        path = f"{IMAGE_PATH}/stock_legend/stockImg_{stock_id}_{time.time()}.png"
+        if is_fund:
+            viewport_size = dict(width=1200, height=3400)
+            await page.set_viewport_size(viewport_size)
+            tmp = page.locator("#hq_ip_tips >> text=立即开启")
+            if tmp:
+                await tmp.click()
+                await page.wait_for_timeout(1000)
+            await page.screenshot(path=path, timeout=10000, clip={"x": 0, "width": 780, "y": 700, "height": 2400})
+        else:
+            page = await page.wait_for_selector(tar, timeout=10000)
+            await page.screenshot(path=path, timeout=10000)
+
+        await browser.close()
+    return image(Path(path))

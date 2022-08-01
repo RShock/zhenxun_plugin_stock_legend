@@ -79,7 +79,7 @@ async def buy_stock_action(user_id: int, group_id: int, stock_id: str, gearing: 
                    f'当前持仓价值 {round((query.number * price - query.cost) * query.gearing + query.cost, 2)}\n' \
                    f'当前持仓成本 {round(query.cost, 2)}\n' \
                    f'杠杆比率 {query.gearing}\n' \
-                   f'剩余资金 {have_gold - cost}'
+                   f'剩余资金 {round(have_gold - origin_cost)}'
         else:
             return f"成功购买了 {round(num / 100, 2)} 手 {name}\n" \
                    f"现价 {price}亓\n" \
@@ -87,7 +87,7 @@ async def buy_stock_action(user_id: int, group_id: int, stock_id: str, gearing: 
                    f"当前持仓价值 {round((query.number * price - query.cost) * query.gearing + query.cost, 2)}\n" \
                    f"当前持仓成本 {round(query.cost, 2)}\n" \
                    f"杠杆比率 {query.gearing}\n" \
-                   f"剩余资金 {have_gold - cost}"
+                   f"剩余资金 {round(have_gold - cost)}"
 
 
 # 快速清仓指令
