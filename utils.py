@@ -280,7 +280,7 @@ async def get_stock_img_v2(origin_stock_id: str, stock_id: str, is_detail: bool 
         is_fund = True
     else:  # 其他ab股
         url = f"http://quote.eastmoney.com/{stock_id}.html"
-        tar = "//div[@id='js_box']"
+        tar = "//div[@class='mainquotecharts']"
     async with async_playwright() as pw:
         browser = await pw.chromium.launch(
             headless=True,
