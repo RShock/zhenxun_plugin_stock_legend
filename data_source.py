@@ -7,6 +7,8 @@ from configs.config import Config
 from .utils import get_stock_info, get_total_value, to_obj, to_txt, is_a_stock, is_st_stock, get_tang_ping_earned
 from services.log import logger
 
+plugin_name = __file__.split('\\')[-2]
+
 
 async def buy_stock_action(user_id: int, group_id: int, stock_id: str, gearing: float, cost: int,
                            force_price: float = None) -> str:
@@ -38,7 +40,7 @@ async def buy_stock_action(user_id: int, group_id: int, stock_id: str, gearing: 
             if not gearing:
                 gearing = stock.gearing
         if not gearing:
-            max_gearing = round(float(Config.get_config("stock_legend", "GEARING_RATIO", 5)), 1)
+            max_gearing = round(float(Config.get_config(plugin_name, "GEARING_RATIO", 5)), 1)
             gearing = max_gearing
         gearing = round(gearing, 1)
         if (stock and have_gold == 0 and gearing == stock.gearing) or (stock is None and have_gold == 0):
@@ -239,12 +241,13 @@ async def buy_lazy_stock_action(user_id: int, group_id: int, cost: float):
         # 如果一个人在10天前买了躺平，现在又买了10块钱，放进去会直接变成10/1.015^10块钱
         if stock:
             _, scale, _ = get_tang_ping_earned(stock, 10)
-            real_cost = cost/scale
+            real_cost = cost / scale
         else:
             real_cost = cost
         await BagUser.spend_gold(user_id, group_id, int(cost))
         await StockDB.buy_stock(uid, "躺平基金", 1, real_cost, cost)
-        return f"欢迎认购躺平基金！您认购了💵{cost}的躺平基金，每待满一天就会获得1.5%的收益！一定要待满才有哦"
+        return f"欢迎认购躺平基金！您认购了💰{cost}的躺平基金，每待满一天就会获得" \
+               f"{round(float(Config.get_config(plugin_name, 'TANG_PING', 0.015)*100), 1)}%的收益！一定要待满才有哦"
 
 
 async def sell_lazy_stock_action(user_id: int, group_id: int, percent: float):
@@ -258,7 +261,7 @@ async def sell_lazy_stock_action(user_id: int, group_id: int, percent: float):
         day, rate, earned = get_tang_ping_earned(stock, percent)
         await stock.sell_stock(uid, "躺平基金", percent)
         await BagUser.add_gold(user_id, group_id, earned)
-        msg = f"坚持持有了{day}天所以翻了{round(rate,2)}倍！(该倍率指最早一批买入资金的倍率）" if day > 0 else "没有坚持持有，只能把钱原路退给你了！"
+        msg = f"坚持持有了{day}天所以翻了{round(rate, 2)}倍！(该倍率指最早一批买入资金的倍率）" if day > 0 else "没有坚持持有，只能把钱原路退给你了！"
         return f"""卖出了{percent}成仓位的躺平基金
 {msg}
 得到了{earned}块钱

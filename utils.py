@@ -2,6 +2,7 @@ import time
 import urllib.request
 from pathlib import Path
 
+import playwright
 from nonebot.adapters.onebot.v11 import Bot, GroupMessageEvent
 from playwright.async_api import async_playwright
 from rfc3986.compat import to_str
@@ -14,6 +15,10 @@ from services import logger
 from utils.http_utils import AsyncPlaywright
 
 import re
+
+from ..nonebot_plugin_htmlrender import text_to_pic
+
+plugin_name = __file__.split('\\')[-2]
 
 
 # 股票名称: infolist[1]
@@ -250,7 +255,7 @@ def fill_stock_id(stock_id: str) -> str:
 
 def get_tang_ping_earned(stock: StockDB, percent: float) -> (int, float, int):
     day = (time.time() - time.mktime(stock.buy_time.timetuple())) // 60 // 60 // 24
-    tang_ping = float(Config.get_config("stock_legend", "TANG_PING", 5))
+    tang_ping = float(Config.get_config(plugin_name, "TANG_PING", 0.015))
     rate = ((1 + tang_ping) ** day)  # 翻倍数
     return day, rate, round(stock.number * rate * percent / 10)
 
@@ -258,15 +263,16 @@ def get_tang_ping_earned(stock: StockDB, percent: float) -> (int, float, int):
 # 采用东财 图像更专业
 async def get_stock_img_v2(origin_stock_id: str, stock_id: str, is_detail: bool = False):
     is_fund = False  # 基金特判
+    tar = None
     if len(origin_stock_id) == 5 and origin_stock_id.isdigit():
         url = f"http://quote.eastmoney.com/hk/{origin_stock_id}.html"
         tar = "//div[contains(@class,'quote3l')][2]//div[@class='quote3l_c']"
+    elif origin_stock_id == "IXIC" or origin_stock_id == "NDX":  # 纳斯达克指数 还有很多同类指数实在是搞不过来 建议直接去买对应基金
+        url = "https://gushitong.baidu.com/index/us-IXIC"
+        tar = ".fac"
     elif stock_id.startswith("us"):
         url = f"http://quote.eastmoney.com/us/{origin_stock_id}.html"
         tar = "//div[contains(@class,'quote3l')][2]//div[@class='quote3l_c']"
-    elif origin_stock_id == "IXIC":  # 纳斯达克指数 还有很多同类指数实在是搞不过来 建议直接去买对应基金
-        url = "https://gushitong.baidu.com/index/us-IXIC"
-        tar = ".fac"
     elif stock_id.startswith('J'):  # 日股
         url = f"https://histock.tw/jpstock/{stock_id[1:]}"
         tar = "//div[@class='grid']"
@@ -281,6 +287,7 @@ async def get_stock_img_v2(origin_stock_id: str, stock_id: str, is_detail: bool 
     else:  # 其他ab股
         url = f"http://quote.eastmoney.com/{stock_id}.html"
         tar = "//div[@class='mainquotecharts']"
+
     async with async_playwright() as pw:
         browser = await pw.chromium.launch(
             headless=True,
@@ -302,6 +309,6 @@ async def get_stock_img_v2(origin_stock_id: str, stock_id: str, is_detail: bool 
         else:
             page = await page.wait_for_selector(tar, timeout=10000)
             await page.screenshot(path=path, timeout=10000)
-
+        # return await text_to_pic(f"查询失败,具体信息:\nurl:{url}\ntar:{tar}", width=600)
         await browser.close()
     return image(Path(path))

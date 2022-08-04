@@ -1,6 +1,7 @@
+import os
 import platform
 
-from nonebot import on_command
+from nonebot import on_command, get_driver
 from nonebot.adapters.onebot.v11 import MessageEvent, GroupMessageEvent, Message, Bot, MessageSegment
 from nonebot.params import CommandArg, ArgPlainText, Arg
 from nonebot.permission import SUPERUSER
@@ -70,7 +71,7 @@ usage：
 __plugin_des__ = "谁才是股市传奇？"
 __plugin_type__ = ("群内小游戏",)
 __plugin_cmd__ = ["买股票 代码 金额]", "卖股票 代码 仓位（十分制）", "我的持仓", "强制清仓"]
-__plugin_version__ = 2.11
+__plugin_version__ = 2.2
 __plugin_author__ = "XiaoR"
 __plugin_settings__ = {
     "level": 5,
@@ -111,6 +112,8 @@ help_stock = on_command("关于股海风云", priority=5, block=True)
 query_stock = on_command("查看股票", priority=5, block=True)
 clear_my_stock = on_command("清仓", priority=5, block=True)
 
+plugin_name = __file__.split('\\')[-2]
+
 
 @buy_stock.handle()
 async def _(event: MessageEvent, arg: Message = CommandArg()):
@@ -133,7 +136,7 @@ async def buy_handle(bot, msg, event):
         cost = int(msg[1])
     stock_id = fill_stock_id(msg[0])
     origin_stock_id = stock_id[2:]
-    max_gearing = round(float(Config.get_config("stock_legend", "GEARING_RATIO", 5)), 1)
+    max_gearing = round(float(Config.get_config(plugin_name, "GEARING_RATIO", 5)), 1)
     gearing = None
     # 第三个参数是杠杆
     # 最大杠杆比率
@@ -201,7 +204,7 @@ async def _(event: MessageEvent, bot: Bot):
         await my_stock.finish(await to_pic_msg("这个游戏只能在群里玩哦"))
     username = await get_username(bot, event.group_id, event.user_id)
 
-    if Config.get_config("stock_legend", "WIN_FIT", False):
+    if Config.get_config(plugin_name, "WIN_FIT", False):
         my_stocks = await get_stock_list_action_for_win(event.user_id, event.group_id)
         await send_forward_msg_group(bot, event, "真寻炒股小助手", my_stocks if my_stocks else ["你还什么都没买呢！"])
     else:
@@ -224,7 +227,7 @@ async def _(event: MessageEvent, bot: Bot, args: Message = CommandArg()):
             look_qq = arg.data.get("qq", "")
 
     username = await get_username(bot, event.group_id, look_qq)
-    if Config.get_config("stock_legend", "WIN_FIT", False):
+    if Config.get_config(plugin_name, "WIN_FIT", False):
         my_stocks = await get_stock_list_action_for_win(event.user_id, event.group_id)
         await send_forward_msg_group(bot, event, "真寻炒股小助手", my_stocks if my_stocks else ["仓位是空的"])
     else:
@@ -281,7 +284,7 @@ async def _():
     await help_stock.finish(
         """作者：小r
 说明：这个插件可以帮多年后的你省很多钱！练习到每天盈利5%+就可以去玩真正的股市了
-版本：v2.11
+版本：v2.2
 查看是否有更新：https://github.com/RShock/zhenxun_plugin_stock_legend""")
 
 
@@ -313,7 +316,7 @@ async def _(event: MessageEvent, arg: Message = CommandArg()):
 
 
 async def get_stock_img_(origin_stock_id, stock_id):
-    if Config.get_config("stock_legend", "IMAGE_MODE", 2) == 2:
+    if Config.get_config(plugin_name, "IMAGE_MODE", 2) == 2:
         return await get_stock_img_v2(origin_stock_id, stock_id)
     else:
         return await get_stock_img(origin_stock_id, stock_id)
