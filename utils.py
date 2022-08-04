@@ -2,7 +2,6 @@ import time
 import urllib.request
 from pathlib import Path
 
-import playwright
 from nonebot.adapters.onebot.v11 import Bot, GroupMessageEvent
 from playwright.async_api import async_playwright
 from rfc3986.compat import to_str
@@ -16,9 +15,7 @@ from utils.http_utils import AsyncPlaywright
 
 import re
 
-from ..nonebot_plugin_htmlrender import text_to_pic
-
-plugin_name = __file__.split('\\')[-2]
+plugin_name = re.split(r'[\\/]', __file__)[-2]
 
 
 # 股票名称: infolist[1]

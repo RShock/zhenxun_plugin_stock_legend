@@ -1,4 +1,5 @@
 import asyncio
+import re
 
 from models.bag_user import BagUser
 from .stock_model import StockDB
@@ -7,7 +8,7 @@ from configs.config import Config
 from .utils import get_stock_info, get_total_value, to_obj, to_txt, is_a_stock, is_st_stock, get_tang_ping_earned
 from services.log import logger
 
-plugin_name = __file__.split('\\')[-2]
+plugin_name = re.split(r'[\\/]', __file__)[-2]
 
 
 async def buy_stock_action(user_id: int, group_id: int, stock_id: str, gearing: float, cost: int,
@@ -247,7 +248,7 @@ async def buy_lazy_stock_action(user_id: int, group_id: int, cost: float):
         await BagUser.spend_gold(user_id, group_id, int(cost))
         await StockDB.buy_stock(uid, "躺平基金", 1, real_cost, cost)
         return f"欢迎认购躺平基金！您认购了💰{cost}的躺平基金，每待满一天就会获得" \
-               f"{round(float(Config.get_config(plugin_name, 'TANG_PING', 0.015)*100), 1)}%的收益！一定要待满才有哦"
+               f"{round(float(Config.get_config(plugin_name, 'TANG_PING', 0.015) * 100), 1)}%的收益！一定要待满才有哦"
 
 
 async def sell_lazy_stock_action(user_id: int, group_id: int, percent: float):

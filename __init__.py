@@ -1,18 +1,12 @@
-import os
-import platform
+import re
 
-from nonebot import on_command, get_driver
+from nonebot import on_command
 from nonebot.adapters.onebot.v11 import MessageEvent, GroupMessageEvent, Message, Bot, MessageSegment
-from nonebot.params import CommandArg, ArgPlainText, Arg
+from nonebot.params import CommandArg
 from nonebot.permission import SUPERUSER
-from nonebot.typing import T_State
-from nonebot.matcher import Matcher
 
-from services.log import logger
 from configs.config import Config
-from .utils import get_stock_img, send_forward_msg_group, convert_stocks_to_md_table, fill_stock_id, get_stock_img_v2
-from ..nonebot_plugin_htmlrender import text_to_pic, md_to_pic
-
+from services.log import logger
 from .data_source import (
     sell_stock_action,
     buy_stock_action,
@@ -23,7 +17,9 @@ from .data_source import (
     buy_lazy_stock_action,
     sell_lazy_stock_action
 )
+from .utils import get_stock_img, send_forward_msg_group, convert_stocks_to_md_table, fill_stock_id, get_stock_img_v2
 from .utils import is_a_stock, get_stock_img, send_forward_msg_group, convert_stocks_to_md_table, fill_stock_id
+from ..nonebot_plugin_htmlrender import text_to_pic, md_to_pic
 
 __zx_plugin_name__ = "股海风云"
 __plugin_usage__ = """
@@ -112,7 +108,7 @@ help_stock = on_command("关于股海风云", priority=5, block=True)
 query_stock = on_command("查看股票", priority=5, block=True)
 clear_my_stock = on_command("清仓", priority=5, block=True)
 
-plugin_name = __file__.split('\\')[-2]
+plugin_name = re.split(r'[\\/]', __file__)[-2]
 
 
 @buy_stock.handle()
