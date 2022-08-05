@@ -230,12 +230,10 @@ async def buy_lazy_stock_action(user_id: int, group_id: int, cost: float):
     # 担心遇到线程问题，加了把锁（不知道有没有用）
     async with lock:
         have_gold = await BagUser.get_gold(user_id, group_id)
-        if have_gold <= 0:
-            return f"虽然你很想躺平，但是你没有足够的钱"
         if cost <= 0:
             return f"买入数量必须是正数哦(0-10:仓位 10+:价格)"
         cost = cost if cost > 10 else round(have_gold * cost / 10, 0)
-        if cost <= 0:
+        if cost <= 0 or have_gold - cost < 0 or have_gold <= 0:
             return f"虽然你很想躺平，但是你没有足够的钱"
         uid = f"{user_id}:{group_id}"
         stock = await StockDB.get_stock(uid, "躺平基金")
