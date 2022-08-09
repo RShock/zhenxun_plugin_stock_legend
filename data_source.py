@@ -71,7 +71,7 @@ async def buy_stock_action(user_id: int, group_id: int, stock_id: str, gearing: 
         query = await StockDB.buy_stock(
             uid, stock_id, gearing, num, cost
         )
-        await StockLogDB.buy_stock_log(uid, stock_id, gearing, num, price, cost, query.buy_time)
+        await StockLogDB.buy_stock_log(uid, stock_id, gearing, num, price, cost)
         await BagUser.spend_gold(user_id, group_id, cost)
     if query:
         if stock and stock.gearing != gearing:
@@ -95,8 +95,15 @@ async def buy_stock_action(user_id: int, group_id: int, stock_id: str, gearing: 
 
 # 快速清仓指令
 async def fast_clear_stock(price, group_id, stock, user_id):
-    await stock.delete()
     v = round(get_total_value(price, stock), 0)
+    await StockLogDB.sell_stock_log(
+        uid=f"{user_id}:{group_id}",
+        stock_id=stock.stock_id,
+        number=stock.number,
+        price=price,
+        get=v,
+        profit=v - stock.cost)
+    await stock.delete()
     await BagUser.add_gold(user_id, group_id, v)
     return v
 
@@ -189,8 +196,11 @@ async def force_clear_action(user_id: int, group_id: int):
     stocks = await StockDB.get_stocks_by_uid(uid)
     tmp = ''
     for stock in stocks:
-        tmp += await sell_stock_action(user_id, group_id, stock.stock_id, 10)
-        tmp += '\n'
+        if stock.stock_id == '躺平基金':
+            tmp += await sell_lazy_stock_action(user_id, group_id, 10)
+        else:
+            tmp += await sell_stock_action(user_id, group_id, stock.stock_id, 10)
+        tmp += '\n\n'
     return len(stocks), tmp
 
 
@@ -244,7 +254,8 @@ async def buy_lazy_stock_action(user_id: int, group_id: int, cost: float):
         else:
             real_cost = cost
         await BagUser.spend_gold(user_id, group_id, int(cost))
-        await StockDB.buy_stock(uid, "躺平基金", 1, real_cost, cost)
+        t = await StockDB.buy_stock(uid, "躺平基金", 1, real_cost, cost)
+        await StockLogDB.buy_stock_log(uid, "躺平基金", 1, real_cost, 1, cost)
         return f"欢迎认购躺平基金！您认购了💰{cost}的躺平基金，每待满一天就会获得" \
                f"{round(float(Config.get_config(plugin_name, 'TANG_PING', 0.015) * 100), 1)}%的收益！一定要待满才有哦"
 
@@ -258,8 +269,10 @@ async def sell_lazy_stock_action(user_id: int, group_id: int, percent: float):
         if not stock:
             return f"你之前不在躺平哦"
         day, rate, earned = get_tang_ping_earned(stock, percent)
+
         await stock.sell_stock(uid, "躺平基金", percent)
         await BagUser.add_gold(user_id, group_id, earned)
+        await StockLogDB.sell_stock_log(uid, "躺平基金", stock.number * percent / 10, 1, earned, earned / (1 + rate))
         msg = f"坚持持有了{day}天所以翻了{round(rate, 2)}倍！(该倍率指最早一批买入资金的倍率）" if day > 0 else "没有坚持持有，只能把钱原路退给你了！"
         return f"""卖出了{percent}成仓位的躺平基金
 {msg}

@@ -40,13 +40,11 @@ class StockLogDB(db.Model):
             number: float,
             price: float,
             cost: float,
-            buy_time: datetime
     ) -> None:
         try:
             async with db.transaction():
                 await cls.create(
-                    uid=uid, stock_id=stock_id, gearing=gearing, number=number, cost=cost, action=1, price=price,
-                    action_time=buy_time
+                    uid=uid, stock_id=stock_id, gearing=gearing, number=number, cost=cost, action=1, price=price
                 )
         except Exception as e:
             logger.info(f"购买日志股票数据库问题 {type(e)}: {e}")

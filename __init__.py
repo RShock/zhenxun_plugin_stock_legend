@@ -1,6 +1,6 @@
 import re
 
-from nonebot import on_command
+from nonebot import on_command, get_driver
 from nonebot.adapters.onebot.v11 import MessageEvent, GroupMessageEvent, Message, Bot, MessageSegment
 from nonebot.params import CommandArg
 from nonebot.permission import SUPERUSER
@@ -67,7 +67,7 @@ usage：
 __plugin_des__ = "谁才是股市传奇？"
 __plugin_type__ = ("群内小游戏",)
 __plugin_cmd__ = ["买股票 代码 金额]", "卖股票 代码 仓位（十分制）", "我的持仓", "强制清仓"]
-__plugin_version__ = 2.3
+__plugin_version__ = 2.4
 __plugin_author__ = "XiaoR"
 __plugin_settings__ = {
     "level": 5,
@@ -110,6 +110,9 @@ clear_my_stock = on_command("清仓", priority=5, block=True)
 
 plugin_name = re.split(r'[\\/]', __file__)[-2]
 
+# driver=get_driver()
+# @driver.on_startup
+# async def _():
 
 @buy_stock.handle()
 async def _(event: MessageEvent, arg: Message = CommandArg()):
@@ -280,7 +283,7 @@ async def _():
     await help_stock.finish(
         """作者：小r
 说明：这个插件可以帮多年后的你省很多钱！练习到每天盈利5%+就可以去玩真正的股市了
-版本：v2.3
+版本：v2.4
 查看是否有更新：https://github.com/RShock/zhenxun_plugin_stock_legend""")
 
 
