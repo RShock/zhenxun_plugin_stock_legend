@@ -211,7 +211,7 @@ async def _(event: MessageEvent, bot: Bot):
         if not my_stocks:
             await sell_stock.finish(await to_pic_msg(f"{username}你还什么都没买呢！", width=300))
         txt = convert_stocks_to_md_table(username, my_stocks)
-        logger.info(txt)
+        # logger.info(txt)
         await sell_stock.finish(MessageSegment.image(await md_to_pic(f"{txt}", width=1000)))
 
 

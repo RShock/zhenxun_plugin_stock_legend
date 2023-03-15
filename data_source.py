@@ -1,9 +1,11 @@
 import asyncio
 import re
 
+from pydantic.types import Decimal
+
 from models.bag_user import BagUser
 from .stock_model import StockDB
-from .stock_log_model import StockLogDB
+# from .stock_log_model import StockLogDB
 from configs.config import Config
 from .utils import get_stock_info, get_total_value, to_obj, to_txt, is_a_stock, is_st_stock, get_tang_ping_earned
 from services.log import logger
@@ -69,15 +71,16 @@ async def buy_stock_action(user_id: int, group_id: int, stock_id: str, gearing: 
             num = cost / price
         # 再买
         query = await StockDB.buy_stock(
-            uid, stock_id, gearing, num, cost
+            uid, stock_id, gearing, Decimal.from_float(num), Decimal.from_float(cost)
         )
-        await StockLogDB.buy_stock_log(uid, stock_id, gearing, num, price, cost)
+        # await StockLogDB.buy_stock_log(uid, stock_id, gearing, num, price, cost)
         await BagUser.spend_gold(user_id, group_id, cost)
     if query:
+        price = Decimal.from_float(price).quantize(Decimal('0.001'))
         if stock and stock.gearing != gearing:
             return f'给{name}追加仓位{origin_cost},修改杠杆为{gearing}\n' \
                    f'因为杠杆的调整，持仓被重新计算了\n' \
-                   f'现价 {price}亓\n' \
+                   f'现价 {price}块\n' \
                    f'当前持仓 {round(query.number / 100, 2)}手\n' \
                    f'当前持仓价值 {round((query.number * price - query.cost) * query.gearing + query.cost, 2)}\n' \
                    f'当前持仓成本 {round(query.cost, 2)}\n' \
@@ -85,7 +88,7 @@ async def buy_stock_action(user_id: int, group_id: int, stock_id: str, gearing: 
                    f'剩余资金 {round(have_gold - origin_cost)}'
         else:
             return f"成功购买了 {round(num / 100, 2)} 手 {name}\n" \
-                   f"现价 {price}亓\n" \
+                   f"现价 {price}块\n" \
                    f"当前持仓 {round(query.number / 100, 2)}手\n" \
                    f"当前持仓价值 {round((query.number * price - query.cost) * query.gearing + query.cost, 2)}\n" \
                    f"当前持仓成本 {round(query.cost, 2)}\n" \
@@ -96,13 +99,13 @@ async def buy_stock_action(user_id: int, group_id: int, stock_id: str, gearing: 
 # 快速清仓指令
 async def fast_clear_stock(price, group_id, stock, user_id):
     v = round(get_total_value(price, stock), 0)
-    await StockLogDB.sell_stock_log(
-        uid=f"{user_id}:{group_id}",
-        stock_id=stock.stock_id,
-        number=stock.number,
-        price=price,
-        get=v,
-        profit=v - stock.cost)
+    # await StockLogDB.sell_stock_log(
+    #     uid=f"{user_id}:{group_id}",
+    #     stock_id=stock.stock_id,
+    #     number=stock.number,
+    #     price=price,
+    #     get=v,
+    #     profit=v - stock.cost)
     await stock.delete()
     await BagUser.add_gold(user_id, group_id, v)
     return v
@@ -146,13 +149,13 @@ async def sell_stock_action(user_id: int, group_id: int, stock_id: str, percent:
         total_value = get_total_value(price, stock)
         return_money = round(total_value * percent / 10, 0)
         earned_percent = round((total_value - stock.cost) / stock.cost * 100, 2)
-        await StockLogDB.sell_stock_log(
-            uid=uid,
-            stock_id=stock_id,
-            number=stock.number * percent / 10,
-            price=price,
-            get=return_money,
-            profit=(total_value - stock.cost) * percent * stock.gearing)
+        # await StockLogDB.sell_stock_log(
+        #     uid=uid,
+        #     stock_id=stock_id,
+        #     number=stock.number * percent / 10,
+        #     price=price,
+        #     get=return_money,
+        #     profit=(total_value - stock.cost) * percent * stock.gearing)
         await BagUser.add_gold(user_id, group_id, return_money)
     if earned_percent < -100:
         lajihua = f"亏了{-earned_percent}%，只能去当三和大神了！"
@@ -173,10 +176,10 @@ async def sell_stock_action(user_id: int, group_id: int, stock_id: str, percent:
     else:
         lajihua = f"赚了{earned_percent}%，正在通知管理员！"
     return f"卖掉了 {name} {percent}成仓位, {lajihua}\n" \
-           f"成交价 {price}亓\n" \
+           f"成交价 {price}块\n" \
            f"卖了 {return_money} 块钱\n" \
-           f"剩余仓位 {round(stock.number * (1 - percent / 10) / 100, 2)} 手\n" \
-           f"剩余仓位当前价值 {round(total_value * (1 - percent / 10), 2)}"
+           f"剩余仓位 {round(float(stock.number) * (1 - percent / 10) / 100, 2)} 手\n" \
+           f"剩余仓位当前价值 {round(float(total_value) * (1 - percent / 10), 2)}"
 
 
 async def get_stock_list_action(uid: int, group_id: int):
@@ -254,8 +257,8 @@ async def buy_lazy_stock_action(user_id: int, group_id: int, cost: float):
         else:
             real_cost = cost
         await BagUser.spend_gold(user_id, group_id, int(cost))
-        t = await StockDB.buy_stock(uid, "躺平基金", 1, real_cost, cost)
-        await StockLogDB.buy_stock_log(uid, "躺平基金", 1, real_cost, 1, cost)
+        t = await StockDB.buy_stock(uid, "躺平基金", 1, Decimal.from_float(real_cost), Decimal.from_float(cost))
+        # await StockLogDB.buy_stock_log(uid, "躺平基金", 1, real_cost, 1, cost)
         return f"欢迎认购躺平基金！您认购了💰{cost}的躺平基金，每待满一天就会获得" \
                f"{round(float(Config.get_config(plugin_name, 'TANG_PING', 0.015) * 100), 1)}%的收益！一定要待满才有哦"
 
@@ -272,7 +275,7 @@ async def sell_lazy_stock_action(user_id: int, group_id: int, percent: float):
 
         await stock.sell_stock(uid, "躺平基金", percent)
         await BagUser.add_gold(user_id, group_id, earned)
-        await StockLogDB.sell_stock_log(uid, "躺平基金", stock.number * percent / 10, 1, earned, earned / (1 + rate))
+        # await StockLogDB.sell_stock_log(uid, "躺平基金", stock.number * percent / 10, 1, earned, earned / (1 + rate))
         msg = f"坚持持有了{day}天所以翻了{round(rate, 2)}倍！(该倍率指最早一批买入资金的倍率）" if day > 0 else "没有坚持持有，只能把钱原路退给你了！"
         return f"""卖出了{percent}成仓位的躺平基金
 {msg}

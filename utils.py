@@ -4,6 +4,7 @@ from pathlib import Path
 
 from nonebot.adapters.onebot.v11 import Bot, GroupMessageEvent
 from playwright.async_api import async_playwright
+from pydantic.types import Decimal
 from rfc3986.compat import to_str
 
 from configs.config import Config
@@ -85,7 +86,7 @@ def is_st_stock(stock_name: str):
 
 # 计算当前持仓值多少钱
 def get_total_value(price, stock):
-    return (stock.number * price - stock.cost) * stock.gearing + stock.cost
+    return float(((stock.number * Decimal.from_float(price) - stock.cost) * stock.gearing + stock.cost).quantize(Decimal('0.00')))
 
 
 async def to_obj(stock: StockDB):
@@ -108,8 +109,8 @@ async def to_obj(stock: StockDB):
             "rate": rate,
             "create_time": time
         }
-    value = round((stock.number * float(price) - stock.cost) * stock.gearing + stock.cost, 2)
-    rate = round(value * 100 / stock.cost - 100, 2)
+    value = ((stock.number * Decimal(price) - stock.cost) * stock.gearing + stock.cost).quantize(Decimal('0.00'))
+    rate = (Decimal(value) * 100 / stock.cost - 100).quantize(Decimal('0.00'))
     rate = f"📈+{rate}%" if rate >= 0 else f"📉{rate}%"
     return {
         "name": infolist[1],
@@ -135,8 +136,8 @@ def to_txt(stock):
 """
     return f"""{stock["name"]} 代码{stock["code"]}
 持仓数 {stock["number"]}手
-现价 {stock["price_now"]}亓
-成本 {stock["price_cost"]}亓
+现价 {stock["price_now"]}块
+成本 {stock["price_cost"]}块
 ⚖比例 {stock["gearing"]}
 花费 {stock["cost"]}金
 当前价值 {stock["value"]}({stock["rate"]})
@@ -254,7 +255,7 @@ def get_tang_ping_earned(stock: StockDB, percent: float) -> (int, float, int):
     day = (time.time() - time.mktime(stock.buy_time.timetuple())) // 60 // 60 // 24
     tang_ping = float(Config.get_config(plugin_name, "TANG_PING", 0.015))
     rate = ((1 + tang_ping) ** day)  # 翻倍数
-    return day, rate, round(stock.number * rate * percent / 10)
+    return day, rate, round(float(stock.number) * rate * percent / 10)
 
 
 # 采用东财 图像更专业
