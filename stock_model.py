@@ -40,23 +40,21 @@ class StockDB(Model):
             cost: Decimal
     ) -> "StockDB":
         try:
-            async with in_transaction():
-                query = await cls.filter(uid=uid, stock_id=stock_id).first()
-                if not query:
-                    logger.info(f"第一次买")
-                    await cls.create(
-                        uid=uid, stock_id=stock_id, gearing=gearing, number=number, cost=cost
-                    )
-                else:
-                    logger.info(f"已经买过了")
-                    query.number = number + query.number
-                    query.cost = cost + query.cost
-                    await query.save()
-                return await cls.filter(uid=uid, stock_id=stock_id).first()
+            query = await cls.filter(uid=uid, stock_id=stock_id).first()
+            if not query:
+                logger.info(f"第一次买")
+                await cls.create(
+                    uid=uid, stock_id=stock_id, gearing=gearing, number=number, cost=cost
+                )
+            else:
+                logger.info(f"已经买过了")
+                query.number = number + query.number
+                query.cost = cost + query.cost
+                await query.save()
+            return await cls.filter(uid=uid, stock_id=stock_id).first()
         except Exception as e:
-            traceback.print_stack()
-            logger.info(traceback.format_exc())
             logger.info(f"购买股票数据库问题 {type(e)}: {e}")
+            raise e
 
     @classmethod
     async def sell_stock(
@@ -66,22 +64,22 @@ class StockDB(Model):
             percent: float
     ) -> None:
         try:
-            async with in_transaction():
-                query = await cls.filter(uid=uid, stock_id=stock_id).first()
-                if not query:
-                    logger.error(f"错误 这个股票不存在")
+            query = await cls.filter(uid=uid, stock_id=stock_id).first()
+            if not query:
+                logger.error(f"错误 这个股票不存在")
+            else:
+                logger.info(f"正在卖股票")
+                if percent != 10:
+                    query.number = query.number * (1 - percent / 10)
+                    query.cost = query.cost * (1 - percent / 10)
+                    await query.save()
                 else:
-                    logger.info(f"正在卖股票")
-                    if percent != 10:
-                        query.number = query.number * (1 - percent / 10)
-                        query.cost = query.cost * (1 - percent / 10)
-                        await query.save()
-                    else:
-                        await query.delete()
+                    await query.delete()
         except Exception as e:
             # do something with the traceback string
-            logger.info(traceback.format_exc())
             logger.info(f"销售股票数据库问题 {type(e)}: {e}")
+            raise e
+
 
     @classmethod
     async def get_stock(
@@ -90,10 +88,10 @@ class StockDB(Model):
             stock_id: str
     ) -> "StockDB":
         try:
-            async with in_transaction():
-                return await cls.filter(uid=uid, stock_id=stock_id).first()
+            return await cls.filter(uid=uid, stock_id=stock_id).first()
         except Exception as e:
             logger.info(f"单个查询股票数据库问题 {type(e)}: {e}")
+            raise e
 
     @classmethod
     async def get_my_stock(
@@ -101,11 +99,11 @@ class StockDB(Model):
             uid: str,
     ) -> List["StockDB"]:
         try:
-            async with in_transaction():
-                return await cls.filter(uid=uid).all()
+            return await cls.filter(uid=uid).all()
         except Exception as e:
-            logger.info(traceback.format_exc())
             logger.info(f"单个查询股票数据库问题 {type(e)}: {e}")
+            raise e
+
 
     @classmethod
     async def clear_stock_by_id(
@@ -114,10 +112,10 @@ class StockDB(Model):
             stock_id: str
     ) -> None:
         try:
-            async with in_transaction():
-                await cls.filter(uid=uid, stock_id=stock_id).delete()
+            await cls.filter(uid=uid, stock_id=stock_id).delete()
         except Exception as e:
             logger.info(f"删除指定股票问题 {type(e)}: {e}")
+            raise e
 
     @classmethod
     async def get_stocks_by_uid(
@@ -125,11 +123,10 @@ class StockDB(Model):
             uid: str,
     ) -> List["StockDB"]:
         try:
-            async with in_transaction():
-
-                return await cls.filter(uid=uid).all()
+            return await cls.filter(uid=uid).all()
         except Exception as e:
             logger.info(f"批量查询股票数据库问题 {type(e)}: {e}")
+            raise e
 
 # StockDB_Pydantic = pydantic_model_creator(StockDB, name="StockDB")
 #
