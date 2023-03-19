@@ -70,8 +70,8 @@ class StockDB(Model):
             else:
                 logger.info(f"正在卖股票")
                 if percent != 10:
-                    query.number = query.number * (1 - percent / 10)
-                    query.cost = query.cost * (1 - percent / 10)
+                    query.number = query.number * (1 - Decimal(percent) / 10)
+                    query.cost = query.cost * (1 - Decimal(percent) / 10)
                     await query.save()
                 else:
                     await query.delete()

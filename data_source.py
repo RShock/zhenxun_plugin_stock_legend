@@ -148,7 +148,7 @@ async def sell_stock_action(user_id: int, group_id: int, stock_id: str, percent:
             stock.cost = 1
         total_value = get_total_value(price, stock)
         return_money = round(total_value * percent / 10, 0)
-        earned_percent = round((total_value - stock.cost) / stock.cost * 100, 2)
+        earned_percent = round((total_value - float(stock.cost)) / float(stock.cost) * 100, 2)
         # await StockLogDB.sell_stock_log(
         #     uid=uid,
         #     stock_id=stock_id,
