@@ -1,5 +1,8 @@
 # 股海风云V2.4
 
+# 如果从旧版迁移需要参考下面issue执行指令：
+https://github.com/RShock/zhenxun_plugin_stock_legend/issues/19
+
 适配真寻的炒股小游戏，使用金币为真寻经济系统的金币，使用的是真实数据
 
 进行了严格的防风控处理，所有消息均为图片发送（windows下持仓依然为组消息）
