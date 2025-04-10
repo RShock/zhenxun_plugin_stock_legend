@@ -31,7 +31,7 @@ usage：
     指令：
     买股票+代码+金额+杠杆倍数(可不填) 买入股票 例：买股票 600888 10000  (买入10000金币的仓位)
     卖股票+代码+仓位百分制 卖出股票 例：卖股票 600888 10 (卖出10层仓位，全卖可以省略这个参数)
-        也支持使用仓位来买股票，如果什么都不填（比如只发送‘买股票600888’）会默认使用满仓满杠杆
+        也支持使用仓位来买股票，如果什么都不填（比如只发送'买股票600888'）会默认使用满仓满杠杆
         不指定杠杆都会默认加满杠杆！
     我的持仓
     查看持仓+atQQ 偷看别人的持仓
@@ -56,7 +56,7 @@ usage：
     A: 分红 挂单
     
     Q: 我是超级新手，怎么玩？
-    A: 可以先输入‘买入躺平基金 x’ x为仓位数 最高10 可不填
+    A: 可以先输入'买入躺平基金 x' x为仓位数 最高10 可不填
     
     Q: 股票代码是从哪里来的？
     A: 需要从现实中的股市提取
@@ -117,7 +117,7 @@ plugin_name = re.split(r'[\\/]', __file__)[-2]
 # async def _():
 
 @buy_stock.handle()
-async def _(event: MessageEvent, session: Uninfo, arg: Message = CommandArg()):
+async def _(bot: Bot, event: MessageEvent, session: Uninfo, arg: Message = CommandArg()):
     if not isinstance(event, GroupMessageEvent):
         await buy_stock.finish(await to_pic_msg("这个游戏只能在群里玩哦"))
     msg = arg.extract_plain_text().strip().split()
@@ -127,7 +127,7 @@ async def _(event: MessageEvent, session: Uninfo, arg: Message = CommandArg()):
     if msg[0] == '躺平' or msg[0] == '躺平基金':  # 买入躺平基金的特殊逻辑
         await buy_lazy_handle(buy_stock, msg, event, session)
         return
-    await buy_handle(buy_stock, msg, event, session)
+    await buy_handle(bot, msg, event, session)
 
 
 async def buy_handle(bot, msg, event, session: Uninfo):
@@ -142,8 +142,8 @@ async def buy_handle(bot, msg, event, session: Uninfo):
     # 第三个参数是杠杆
     # 最大杠杆比率
     if cost == 0 and len(msg) == 2:  # 专门用来看行情，但是加上杠杆参数就是改杠杆了
-        await bot.send(await to_pic_msg(f"你看了看，但没有买", width=300))
-        await bot.finish(await get_stock_img_(origin_stock_id, stock_id))
+        await buy_stock.send(await to_pic_msg(f"你看了看，但没有买", width=300))
+        await PlatformUtils.send_message(bot, None, str(event.group_id), await get_stock_img_(origin_stock_id, stock_id))
     if cost < 0:
         if cost < -max_gearing:
             await bot.finish(await to_pic_msg(f"想做空的话\n请使用负数的杠杆率哦", width=300))
@@ -155,23 +155,24 @@ async def buy_handle(bot, msg, event, session: Uninfo):
         if gearing > max_gearing:
             if -max_gearing <= cost <= max_gearing:  # 防呆，这人把输入参数顺序搞反了
                 cost, gearing = gearing, cost
-                await bot.send(await to_pic_msg(
+                await buy_stock.send(await to_pic_msg(
                     f"你的杠杆和花费金币参数顺序反了，已经帮你修好了", width=300))
             else:
-                await bot.send(await to_pic_msg(
+                await buy_stock.send(await to_pic_msg(
                     f"最高杠杆只能到{max_gearing}倍,\n已经修正为{max_gearing}倍", width=300))
             gearing = max_gearing
         if gearing < -max_gearing:
-            await bot.send(await to_pic_msg(
+            await buy_stock.send(await to_pic_msg(
                 f"最高杠杆只能到-{max_gearing}倍,\n已经修正为-{max_gearing}倍", width=300))
             gearing = -max_gearing
     result = await buy_stock_action(int(session.user.id), event.group_id, stock_id, float(gearing), int(cost), 0, PlatformUtils.get_platform(session))
-    await bot.send(await to_pic_msg(result, width=300))
-    await bot.finish(await get_stock_img_(origin_stock_id, stock_id))
+    await buy_stock.send(await to_pic_msg(result, width=300))
+    await PlatformUtils.send_message(bot, None, str(event.group_id), await get_stock_img_(origin_stock_id, stock_id))
 
 
 @sell_stock.handle()
 async def _(
+        bot: Bot,
         event: MessageEvent,
         session: Uninfo,
         arg: Message = CommandArg(),
@@ -199,7 +200,7 @@ async def _(
     result = await sell_stock_action(int(session.user.id), event.group_id, stock_id, percent, 0, PlatformUtils.get_platform(session))
     await sell_stock.send(await to_pic_msg(result, width=300))
     origin_stock_id = stock_id[2:]
-    await sell_stock.finish(await get_stock_img_(origin_stock_id, stock_id))
+    await PlatformUtils.send_message(bot, None, str(event.group_id), await get_stock_img_(origin_stock_id, stock_id))
 
 
 @my_stock.handle()

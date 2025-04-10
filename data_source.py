@@ -258,7 +258,7 @@ async def buy_lazy_stock_action(user_id: int, group_id: int, cost: float, platfo
             real_cost = cost / scale
         else:
             real_cost = cost
-        await UserConsole.reduce_gold(str(user_id), int(cost), GoldHandle.PLUGIN, plugin_name, platform)
+        await UserConsole.reduce_gold(str(user_id), round(cost), GoldHandle.PLUGIN, plugin_name, platform)
         t = await StockDB.buy_stock(uid, "躺平基金", 1, Decimal.from_float(real_cost), Decimal.from_float(cost))
         # await StockLogDB.buy_stock_log(uid, "躺平基金", 1, real_cost, 1, cost)
         return f"欢迎认购躺平基金！您认购了💰{cost}的躺平基金，每待满一天就会获得" \
