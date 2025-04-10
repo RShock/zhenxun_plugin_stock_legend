@@ -4,6 +4,7 @@ from nonebot import on_command, get_driver
 from nonebot.adapters.onebot.v11 import MessageEvent, GroupMessageEvent, Message, Bot, MessageSegment
 from nonebot.params import CommandArg
 from nonebot.permission import SUPERUSER
+from nonebot_plugin_uninfo import Uninfo
 
 from zhenxun.configs.config import Config
 from zhenxun.services.log import logger
@@ -116,7 +117,7 @@ plugin_name = re.split(r'[\\/]', __file__)[-2]
 # async def _():
 
 @buy_stock.handle()
-async def _(event: MessageEvent, arg: Message = CommandArg()):
+async def _(event: MessageEvent, session: Uninfo, arg: Message = CommandArg()):
     if not isinstance(event, GroupMessageEvent):
         await buy_stock.finish(await to_pic_msg("这个游戏只能在群里玩哦"))
     msg = arg.extract_plain_text().strip().split()
@@ -124,12 +125,12 @@ async def _(event: MessageEvent, arg: Message = CommandArg()):
         await buy_stock.finish(await to_pic_msg(
             f"格式错误，请输入\n买股票 股票代码 金额 杠杆层数(可选)\n如 买股票 600888 1000 5", width=300))
     if msg[0] == '躺平' or msg[0] == '躺平基金':  # 买入躺平基金的特殊逻辑
-        await buy_lazy_handle(buy_stock, msg, event)
+        await buy_lazy_handle(buy_stock, msg, event, session)
         return
-    await buy_handle(buy_stock, msg, event)
+    await buy_handle(buy_stock, msg, event, session)
 
 
-async def buy_handle(bot, msg, event):
+async def buy_handle(bot, msg, event, session: Uninfo):
     if len(msg) == 1:
         cost = 10  # 10成仓位
     else:
@@ -137,7 +138,7 @@ async def buy_handle(bot, msg, event):
     stock_id = fill_stock_id(msg[0])
     origin_stock_id = stock_id[2:]
     max_gearing = round(float(Config.get_config(plugin_name, "GEARING_RATIO", 5)), 1)
-    gearing = None
+    gearing = 0
     # 第三个参数是杠杆
     # 最大杠杆比率
     if cost == 0 and len(msg) == 2:  # 专门用来看行情，但是加上杠杆参数就是改杠杆了
@@ -164,7 +165,7 @@ async def buy_handle(bot, msg, event):
             await bot.send(await to_pic_msg(
                 f"最高杠杆只能到-{max_gearing}倍,\n已经修正为-{max_gearing}倍", width=300))
             gearing = -max_gearing
-    result = await buy_stock_action(event.user_id, event.group_id, stock_id, gearing, cost)
+    result = await buy_stock_action(int(session.user.id), event.group_id, stock_id, float(gearing), int(cost), 0, PlatformUtils.get_platform(session))
     await bot.send(await to_pic_msg(result, width=300))
     await bot.finish(await get_stock_img_(origin_stock_id, stock_id))
 
@@ -172,7 +173,10 @@ async def buy_handle(bot, msg, event):
 @sell_stock.handle()
 async def _(
         event: MessageEvent,
-        arg: Message = CommandArg()):
+        session: Uninfo,
+        arg: Message = CommandArg(),
+        
+):
     if not isinstance(event, GroupMessageEvent):
         await sell_stock.finish(await to_pic_msg("这个游戏只能在群里玩哦"))
     msg = arg.extract_plain_text().strip().split()
@@ -190,9 +194,9 @@ async def _(
     if percent <= 0:
         await sell_stock.finish(await to_pic_msg("卖的仓位太低了！"))
     if msg[0] == '躺平' or msg[0] == '躺平基金':  # 卖出躺平基金的特殊逻辑
-        await sell_lazy_handle(buy_stock, percent, event)
+        await sell_lazy_handle(buy_stock, percent, event, session)
         return
-    result = await sell_stock_action(event.user_id, event.group_id, stock_id, percent)
+    result = await sell_stock_action(int(session.user.id), event.group_id, stock_id, percent, 0, PlatformUtils.get_platform(session))
     await sell_stock.send(await to_pic_msg(result, width=300))
     origin_stock_id = stock_id[2:]
     await sell_stock.finish(await get_stock_img_(origin_stock_id, stock_id))
@@ -290,15 +294,15 @@ async def _():
 
 # 躺平基金是给不会炒股的人(以及周六日)玩的基金，每天收益为1.5%(默认)
 # 虽然看起来很高但是实际上30天也就1.56倍，可以接受
-async def buy_lazy_handle(bot, msg, event) -> None:
+async def buy_lazy_handle(bot, msg, event, session: Uninfo) -> None:
     cost = 10 if len(msg) <= 1 else float(msg[1])
     await bot.finish(MessageSegment.image(
         await text_to_pic(
-            await buy_lazy_stock_action(event.user_id, event.group_id, cost), width=300)))
+            await buy_lazy_stock_action(int(session.user.id), event.group_id, cost, PlatformUtils.get_platform(session)), width=300)))
 
 
-async def sell_lazy_handle(bot, percent, event) -> None:
-    tmp = await sell_lazy_stock_action(event.user_id, event.group_id, percent)
+async def sell_lazy_handle(bot, percent, event, session: Uninfo) -> None:
+    tmp = await sell_lazy_stock_action(int(session.user.id), event.group_id, percent, PlatformUtils.get_platform(session))
     await bot.finish(await to_pic_msg(tmp, width=400))
 
 
@@ -312,7 +316,7 @@ async def _(bot: Bot, event: MessageEvent, arg: Message = CommandArg()):
         await revert_stock.finish(await to_pic_msg("格式错误，请输入查看股票 股票/基金代码", width=300))
     await query_stock.send(await to_pic_msg("正在查询...", width=200))
     stock_id = fill_stock_id(msg[0])
-    await PlatformUtils.send_message(bot, None, event.group_id, await get_stock_img_(msg[0], stock_id))
+    await PlatformUtils.send_message(bot, None, str(event.group_id), await get_stock_img_(msg[0], stock_id))
 
 
 async def get_stock_img_(origin_stock_id, stock_id):
