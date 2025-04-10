@@ -1,11 +1,11 @@
 import traceback
 
-from pydantic.types import Decimal
+from decimal import Decimal
+from typing import List, Optional, Sequence
 
-from services import Model
-from services.log import logger
+from zhenxun.services.db_context import Model
+from zhenxun.services.log import logger
 from datetime import datetime
-from typing import List
 from tortoise import fields
 
 from tortoise.contrib.pydantic import pydantic_model_creator
@@ -16,12 +16,12 @@ class StockDB(Model):
     id = fields.IntField(pk=True, generated=True, auto_increment=True)
     uid = fields.CharField(max_length=255, null=False)
     stock_id = fields.CharField(max_length=255, null=False)
-    number = fields.DecimalField(max_digits=10,decimal_places=3, null=True)
+    number = fields.DecimalField(max_digits=10, decimal_places=3, null=True)
     buy_time = fields.DatetimeField(auto_now_add=True)
-    gearing = fields.DecimalField(max_digits=10,  decimal_places=3,null=True, default=1)
-    cost = fields.DecimalField(max_digits=10, decimal_places=3,null=True)
+    gearing = fields.DecimalField(max_digits=10,  decimal_places=3, null=True, default=1)
+    cost = fields.DecimalField(max_digits=10, decimal_places=3, null=True)
 
-    class Meta:
+    class Meta(Model.Meta):
         table = "stock_game"
         table_description = "股海风云·股票表"
 
@@ -38,7 +38,7 @@ class StockDB(Model):
             gearing: float,
             number: Decimal,
             cost: Decimal
-    ) -> "StockDB":
+    ) -> "StockDB | None":
         try:
             query = await cls.filter(uid=uid, stock_id=stock_id).first()
             if not query:
@@ -86,7 +86,7 @@ class StockDB(Model):
             cls,
             uid: str,
             stock_id: str
-    ) -> "StockDB":
+    ) -> "StockDB | None":
         try:
             return await cls.filter(uid=uid, stock_id=stock_id).first()
         except Exception as e:
@@ -97,7 +97,7 @@ class StockDB(Model):
     async def get_my_stock(
             cls,
             uid: str,
-    ) -> List["StockDB"]:
+    ) -> Sequence["StockDB"]:
         try:
             return await cls.filter(uid=uid).all()
         except Exception as e:
@@ -121,7 +121,7 @@ class StockDB(Model):
     async def get_stocks_by_uid(
             cls,
             uid: str,
-    ) -> List["StockDB"]:
+    ) -> Sequence["StockDB"]:
         try:
             return await cls.filter(uid=uid).all()
         except Exception as e:

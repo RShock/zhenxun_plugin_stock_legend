@@ -3,16 +3,17 @@ import urllib.request
 from pathlib import Path
 
 from nonebot.adapters.onebot.v11 import Bot, GroupMessageEvent
-from playwright.async_api import async_playwright
-from pydantic.types import Decimal
+from playwright.async_api import async_playwright, ViewportSize
+from decimal import Decimal
 from rfc3986.compat import to_str
 
-from configs.config import Config
-from configs.path_config import IMAGE_PATH
-from utils.message_builder import image
+from zhenxun.configs.config import Config
+from zhenxun.configs.path_config import IMAGE_PATH
+from zhenxun.utils.message import MessageUtils
 from .stock_model import StockDB
-from services import logger
-from utils.http_utils import AsyncPlaywright
+from zhenxun.services.log import logger
+from zhenxun.utils.http_utils import AsyncPlaywright
+from nonebot_plugin_htmlrender import text_to_pic
 
 import re
 
@@ -70,8 +71,10 @@ async def get_jp_stock_info(jp_stock_id):
     result = urllib.request.urlopen(req).read().decode("utf-8")
     m = re.search(r'clr-rd">(\d+)<', result)
     m2 = re.search(r'\s+(.*)</h3>', result)
-    print(m.group(1))
-    print(m2.group(1))
+    
+    if m is None or m2 is None:
+        return []
+    
     return [None, m2.group(1), jp_stock_id, m.group(1), None, None, None, None]
 
 
@@ -172,7 +175,7 @@ async def send_forward_msg_group(
         bot: Bot,
         event: GroupMessageEvent,
         name: str,
-        stocks: [],
+        stocks: list[str],
 ):
     """
     合并消息
@@ -251,8 +254,8 @@ def fill_stock_id(stock_id: str) -> str:
     return "us" + stock_id
 
 
-def get_tang_ping_earned(stock: StockDB, percent: float) -> (int, float, int):
-    day = (time.time() - time.mktime(stock.buy_time.timetuple())) // 60 // 60 // 24
+def get_tang_ping_earned(stock: StockDB, percent: float) -> tuple[int, float, int]:
+    day = int(time.time() - time.mktime(stock.buy_time.timetuple())) // 60 // 60 // 24
     tang_ping = float(Config.get_config(plugin_name, "TANG_PING", 0.015))
     rate = ((1 + tang_ping) ** day)  # 翻倍数
     return day, rate, round(float(stock.number) * rate * percent / 10)
@@ -297,7 +300,7 @@ async def get_stock_img_v2(origin_stock_id: str, stock_id: str, is_detail: bool 
 
         path = f"{IMAGE_PATH}/stock_legend/stockImg_{stock_id}_{time.time()}.png"
         if is_fund:
-            viewport_size = dict(width=1200, height=3400)
+            viewport_size = ViewportSize(width=1200, height=3400)
             await page.set_viewport_size(viewport_size)
             tmp = page.locator("#hq_ip_tips >> text=立即开启")
             if tmp:
@@ -305,8 +308,12 @@ async def get_stock_img_v2(origin_stock_id: str, stock_id: str, is_detail: bool 
                 await page.wait_for_timeout(1000)
             await page.screenshot(path=path, timeout=10000, clip={"x": 0, "width": 780, "y": 700, "height": 2400})
         else:
-            page = await page.wait_for_selector(tar, timeout=10000)
-            await page.screenshot(path=path, timeout=10000)
-        # return await text_to_pic(f"查询失败,具体信息:\nurl:{url}\ntar:{tar}", width=600)
+            if tar is None:
+                return await text_to_pic(f"查询失败,具体信息:\nurl:{url}\ntar:{tar}", width=600)
+            element = await page.wait_for_selector(tar, timeout=10000)
+            if element:
+                await element.screenshot(path=path, timeout=10000)
+            else:
+                return await text_to_pic(f"查询失败,具体信息:\nurl:{url}\ntar:{tar}", width=600)
         await browser.close()
-    return image(Path(path))
+    return MessageUtils.build_message(Path(path))

@@ -1,20 +1,21 @@
 import asyncio
 import re
 
-from pydantic.types import Decimal
+from decimal import Decimal
 
-from models.bag_user import BagUser
+from zhenxun.utils.enum import GoldHandle
+from zhenxun.models.user_console import UserConsole
 from .stock_model import StockDB
 # from .stock_log_model import StockLogDB
-from configs.config import Config
+from zhenxun.configs.config import Config
 from .utils import get_stock_info, get_total_value, to_obj, to_txt, is_a_stock, is_st_stock, get_tang_ping_earned
-from services.log import logger
+from zhenxun.services.log import logger
 
 plugin_name = re.split(r'[\\/]', __file__)[-2]
 
 
 async def buy_stock_action(user_id: int, group_id: int, stock_id: str, gearing: float, cost: int,
-                           force_price: float = None) -> str:
+                           force_price: float = 0, platform: str | None = None) -> str | None:
     infolist = await get_stock_info(stock_id)
     if len(infolist) <= 7:
         return f"未找到对应股票，提示：请使用股票代码而不是名字"
@@ -26,11 +27,12 @@ async def buy_stock_action(user_id: int, group_id: int, stock_id: str, gearing: 
     lock = asyncio.Lock()
     # 担心遇到线程问题，加了把锁（不知道有没有用）
     async with lock:
-        have_gold = await BagUser.get_gold(user_id, group_id)
+        user = await UserConsole.get_user(str(user_id), platform)
+        have_gold = user.gold
         if have_gold <= 0 and gearing is None:  # 先筛选一种情况
             return f"你没有钱买股票"
         if 0 < cost <= 10:  # 如果花费小于10，认为他说的是仓位而不是花费
-            cost = have_gold * cost / 10
+            cost = int(have_gold * cost / 10)
         elif have_gold < cost:
             return f"你当前只有{have_gold},买不起{cost}的股票哦"
         if price == 0:
@@ -41,7 +43,7 @@ async def buy_stock_action(user_id: int, group_id: int, stock_id: str, gearing: 
         # 先理清楚杠杆到底是多少
         if stock:
             if not gearing:
-                gearing = stock.gearing
+                gearing = float(stock.gearing)
         if not gearing:
             max_gearing = round(float(Config.get_config(plugin_name, "GEARING_RATIO", 5)), 1)
             gearing = max_gearing
@@ -66,7 +68,7 @@ async def buy_stock_action(user_id: int, group_id: int, stock_id: str, gearing: 
             # 先把旧股票全卖了
             earned = await fast_clear_stock(price, group_id, stock, user_id)
             # 加上当前本金
-            cost = earned + cost
+            cost = int(earned + cost)
             # 算出当前股数
             num = cost / price
         # 再买
@@ -74,7 +76,7 @@ async def buy_stock_action(user_id: int, group_id: int, stock_id: str, gearing: 
             uid, stock_id, gearing, Decimal.from_float(num), Decimal.from_float(cost)
         )
         # await StockLogDB.buy_stock_log(uid, stock_id, gearing, num, price, cost)
-        await BagUser.spend_gold(user_id, group_id, cost)
+        await UserConsole.reduce_gold(str(user_id), int(cost), GoldHandle.PLUGIN, plugin_name, platform)
     if query:
         price = Decimal.from_float(price).quantize(Decimal('0.001'))
         if stock and stock.gearing != gearing:
@@ -97,7 +99,7 @@ async def buy_stock_action(user_id: int, group_id: int, stock_id: str, gearing: 
 
 
 # 快速清仓指令
-async def fast_clear_stock(price, group_id, stock, user_id):
+async def fast_clear_stock(price, group_id, stock, user_id, platform: str | None = None):
     v = round(get_total_value(price, stock), 0)
     # await StockLogDB.sell_stock_log(
     #     uid=f"{user_id}:{group_id}",
@@ -107,16 +109,16 @@ async def fast_clear_stock(price, group_id, stock, user_id):
     #     get=v,
     #     profit=v - stock.cost)
     await stock.delete()
-    await BagUser.add_gold(user_id, group_id, v)
+    await UserConsole.add_gold(str(user_id), int(v), GoldHandle.GET, platform)
     return v
 
 
 async def sell_stock_action(user_id: int, group_id: int, stock_id: str, percent: float,
-                            force_price: float = None):
+                            force_price: float = 0, platform: str | None = None):
     infolist = await get_stock_info(stock_id)
     if len(infolist) <= 7:
         return f"未找到对应股票，提示：请使用股票代码而不是名字"
-    logger.info(infolist)
+    logger.info(str(infolist))
 
     if force_price:
         price = force_price
@@ -145,7 +147,7 @@ async def sell_stock_action(user_id: int, group_id: int, stock_id: str, percent:
             uid, stock_id, percent
         )
         if stock.cost <= 0:  # 正常情况不会出现，但是一旦出现需要异常修复
-            stock.cost = 1
+            stock.cost = Decimal.from_float(1)
         total_value = get_total_value(price, stock)
         return_money = round(total_value * percent / 10, 0)
         earned_percent = round((total_value - float(stock.cost)) / float(stock.cost) * 100, 2)
@@ -156,7 +158,7 @@ async def sell_stock_action(user_id: int, group_id: int, stock_id: str, percent:
         #     price=price,
         #     get=return_money,
         #     profit=(total_value - stock.cost) * percent * stock.gearing)
-        await BagUser.add_gold(user_id, group_id, return_money)
+        await UserConsole.add_gold(str(user_id), int(return_money), GoldHandle.GET, platform)
     if earned_percent < -100:
         lajihua = f"亏了{-earned_percent}%，只能去当三和大神了！"
     elif earned_percent < -10:
@@ -207,7 +209,7 @@ async def force_clear_action(user_id: int, group_id: int):
     return len(stocks), tmp
 
 
-async def revert_stock_action(user_id: int, group_id: int, stock_id: str):
+async def revert_stock_action(user_id: int, group_id: int, stock_id: str, platform: str | None = None):
     infolist = await get_stock_info(stock_id)
     if len(infolist) <= 7:
         return f"未找到对应股票，提示：请使用股票代码而不是名字"
@@ -228,9 +230,8 @@ async def revert_stock_action(user_id: int, group_id: int, stock_id: str):
 
             if float(infolist[5]) > 9.9 or float(infolist[5]) < -9.9:
                 return f"该功能在涨跌停时关闭！"
-
-        total_value = await fast_clear_stock(price, group_id, stock, user_id)
-        await buy_stock_action(user_id, group_id, stock_id, gearing, total_value, price)
+        total_value = await fast_clear_stock(price, group_id, stock, user_id, platform)
+        await buy_stock_action(user_id, group_id, stock_id, float(gearing), int(total_value), price, platform)
     return f"""反转{name}仓位成功！
 当前股票价格{price}
 当前杠杆{gearing}
@@ -238,11 +239,12 @@ async def revert_stock_action(user_id: int, group_id: int, stock_id: str):
 """
 
 
-async def buy_lazy_stock_action(user_id: int, group_id: int, cost: float):
+async def buy_lazy_stock_action(user_id: int, group_id: int, cost: float, platform: str | None = None):
     lock = asyncio.Lock()
     # 担心遇到线程问题，加了把锁（不知道有没有用）
     async with lock:
-        have_gold = await BagUser.get_gold(user_id, group_id)
+        user = await UserConsole.get_user(str(user_id), platform)
+        have_gold = user.gold
         if cost <= 0:
             return f"买入数量必须是正数哦(0-10:仓位 10+:价格)"
         cost = cost if cost > 10 else round(have_gold * cost / 10, 0)
@@ -256,14 +258,14 @@ async def buy_lazy_stock_action(user_id: int, group_id: int, cost: float):
             real_cost = cost / scale
         else:
             real_cost = cost
-        await BagUser.spend_gold(user_id, group_id, int(cost))
+        await UserConsole.reduce_gold(str(user_id), int(cost), GoldHandle.PLUGIN, plugin_name, platform)
         t = await StockDB.buy_stock(uid, "躺平基金", 1, Decimal.from_float(real_cost), Decimal.from_float(cost))
         # await StockLogDB.buy_stock_log(uid, "躺平基金", 1, real_cost, 1, cost)
         return f"欢迎认购躺平基金！您认购了💰{cost}的躺平基金，每待满一天就会获得" \
                f"{round(float(Config.get_config(plugin_name, 'TANG_PING', 0.015) * 100), 1)}%的收益！一定要待满才有哦"
 
 
-async def sell_lazy_stock_action(user_id: int, group_id: int, percent: float):
+async def sell_lazy_stock_action(user_id: int, group_id: int, percent: float, platform: str | None = None):
     lock = asyncio.Lock()
     # 担心遇到线程问题，加了把锁（不知道有没有用）
     async with lock:
@@ -274,7 +276,7 @@ async def sell_lazy_stock_action(user_id: int, group_id: int, percent: float):
         day, rate, earned = get_tang_ping_earned(stock, percent)
 
         await stock.sell_stock(uid, "躺平基金", percent)
-        await BagUser.add_gold(user_id, group_id, earned)
+        await UserConsole.add_gold(str(user_id), int(earned), GoldHandle.GET, platform)
         # await StockLogDB.sell_stock_log(uid, "躺平基金", stock.number * percent / 10, 1, earned, earned / (1 + rate))
         msg = f"坚持持有了{day}天所以翻了{round(rate, 2)}倍！(该倍率指最早一批买入资金的倍率）" if day > 0 else "没有坚持持有，只能把钱原路退给你了！"
         return f"""卖出了{percent}成仓位的躺平基金
