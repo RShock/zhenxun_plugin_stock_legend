@@ -7,12 +7,12 @@ from playwright.async_api import async_playwright
 from pydantic.types import Decimal
 from rfc3986.compat import to_str
 
-from configs.config import Config
-from configs.path_config import IMAGE_PATH
-from utils.message_builder import image
+from zhenxun.configs.config import Config
+from zhenxun.configs.path_config import IMAGE_PATH
+from zhenxun.utils.message import MessageUtils
 from .stock_model import StockDB
-from services import logger
-from utils.http_utils import AsyncPlaywright
+from zhenxun.services.log import logger
+from zhenxun.utils.http_utils import AsyncPlaywright
 
 import re
 
@@ -172,7 +172,7 @@ async def send_forward_msg_group(
         bot: Bot,
         event: GroupMessageEvent,
         name: str,
-        stocks: [],
+        stocks: list[str],
 ):
     """
     合并消息
@@ -251,7 +251,7 @@ def fill_stock_id(stock_id: str) -> str:
     return "us" + stock_id
 
 
-def get_tang_ping_earned(stock: StockDB, percent: float) -> (int, float, int):
+def get_tang_ping_earned(stock: StockDB, percent: float) -> tuple[int, float, int]:
     day = (time.time() - time.mktime(stock.buy_time.timetuple())) // 60 // 60 // 24
     tang_ping = float(Config.get_config(plugin_name, "TANG_PING", 0.015))
     rate = ((1 + tang_ping) ** day)  # 翻倍数
@@ -309,4 +309,4 @@ async def get_stock_img_v2(origin_stock_id: str, stock_id: str, is_detail: bool 
             await page.screenshot(path=path, timeout=10000)
         # return await text_to_pic(f"查询失败,具体信息:\nurl:{url}\ntar:{tar}", width=600)
         await browser.close()
-    return image(Path(path))
+    return MessageUtils.build_message(Path(path))

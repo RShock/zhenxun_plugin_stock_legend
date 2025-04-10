@@ -5,8 +5,9 @@ from nonebot.adapters.onebot.v11 import MessageEvent, GroupMessageEvent, Message
 from nonebot.params import CommandArg
 from nonebot.permission import SUPERUSER
 
-from configs.config import Config
-from services.log import logger
+from zhenxun.configs.config import Config
+from zhenxun.services.log import logger
+from zhenxun.utils.platform import PlatformUtils
 from .data_source import (
     sell_stock_action,
     buy_stock_action,
@@ -19,7 +20,7 @@ from .data_source import (
 )
 from .utils import get_stock_img, send_forward_msg_group, convert_stocks_to_md_table, fill_stock_id, get_stock_img_v2
 from .utils import is_a_stock, get_stock_img, send_forward_msg_group, convert_stocks_to_md_table, fill_stock_id
-from ..nonebot_plugin_htmlrender import text_to_pic, md_to_pic
+from nonebot_plugin_htmlrender import text_to_pic, md_to_pic
 
 __zx_plugin_name__ = "股海风云"
 __plugin_usage__ = """
@@ -302,7 +303,7 @@ async def sell_lazy_handle(bot, percent, event) -> None:
 
 
 @query_stock.handle()
-async def _(event: MessageEvent, arg: Message = CommandArg()):
+async def _(bot: Bot, event: MessageEvent, arg: Message = CommandArg()):
     if not isinstance(event, GroupMessageEvent):
         await revert_stock.finish(await to_pic_msg("这个游戏只能在群里玩哦"))
 
@@ -311,7 +312,7 @@ async def _(event: MessageEvent, arg: Message = CommandArg()):
         await revert_stock.finish(await to_pic_msg("格式错误，请输入查看股票 股票/基金代码", width=300))
     await query_stock.send(await to_pic_msg("正在查询...", width=200))
     stock_id = fill_stock_id(msg[0])
-    await query_stock.finish(await get_stock_img_(msg[0], stock_id))
+    await PlatformUtils.send_message(bot, None, event.group_id, await get_stock_img_(msg[0], stock_id))
 
 
 async def get_stock_img_(origin_stock_id, stock_id):

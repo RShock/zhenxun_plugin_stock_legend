@@ -2,8 +2,8 @@ import traceback
 
 from pydantic.types import Decimal
 
-from services import Model
-from services.log import logger
+from zhenxun.services.db_context import Model
+from zhenxun.services.log import logger
 from datetime import datetime
 from typing import List
 from tortoise import fields

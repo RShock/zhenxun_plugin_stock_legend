@@ -3,12 +3,12 @@ import re
 
 from pydantic.types import Decimal
 
-from models.bag_user import BagUser
+from zhenxun.models.bag_user import BagUser
 from .stock_model import StockDB
 # from .stock_log_model import StockLogDB
-from configs.config import Config
+from zhenxun.configs.config import Config
 from .utils import get_stock_info, get_total_value, to_obj, to_txt, is_a_stock, is_st_stock, get_tang_ping_earned
-from services.log import logger
+from zhenxun.services.log import logger
 
 plugin_name = re.split(r'[\\/]', __file__)[-2]
 
