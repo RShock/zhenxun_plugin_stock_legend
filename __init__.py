@@ -146,7 +146,7 @@ async def buy_handle(bot, msg, event, session: Uninfo):
         await PlatformUtils.send_message(bot, None, str(event.group_id), await get_stock_img_(origin_stock_id, stock_id))
     if cost < 0:
         if cost < -max_gearing:
-            await bot.finish(await to_pic_msg(f"想做空的话\n请使用负数的杠杆率哦", width=300))
+            await buy_stock.finish(await to_pic_msg(f"想做空的话\n请使用负数的杠杆率哦", width=300))
         else:  # 这个人输入了买股票xxxx -10 (-10应该是杠杆倍率而不是cost)
             gearing = cost
             cost = 10
