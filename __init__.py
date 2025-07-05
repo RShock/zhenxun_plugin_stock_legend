@@ -2,12 +2,15 @@ import re
 
 from nonebot import on_command, get_driver
 from nonebot.adapters.onebot.v11 import MessageEvent, GroupMessageEvent, Message, Bot, MessageSegment
+from nonebot.plugin import PluginMetadata
 from nonebot.params import CommandArg
 from nonebot.permission import SUPERUSER
+from nonebot.rule import CommandRule
 from nonebot_plugin_uninfo import Uninfo
 
 from zhenxun.configs.config import Config
 from zhenxun.services.log import logger
+from zhenxun.configs.utils import Command, PluginExtraData, RegisterConfig
 from zhenxun.utils.platform import PlatformUtils
 from .data_source import (
     sell_stock_action,
@@ -23,9 +26,11 @@ from .utils import get_stock_img, send_forward_msg_group, convert_stocks_to_md_t
 from .utils import is_a_stock, get_stock_img, send_forward_msg_group, convert_stocks_to_md_table, fill_stock_id
 from nonebot_plugin_htmlrender import text_to_pic, md_to_pic
 
-__zx_plugin_name__ = "股海风云"
-__plugin_usage__ = """
-usage：
+
+__plugin_meta__ = PluginMetadata(
+    name="股海风云",
+    description="谁才是股市传奇？",
+    usage="""
     简单股市小游戏，T+0 可做空 保证金无限 最高10倍杠杆 0手续费
 
     指令：
@@ -65,40 +70,47 @@ usage：
     A: 当基金玩的
     ————————————————
     强制清仓+qq号(不是at是qq号)  管理专用指令，爆仓人不愿意清仓就对他使用这个吧
-""".strip()
-__plugin_des__ = "谁才是股市传奇？"
-__plugin_type__ = ("群内小游戏",)
-__plugin_cmd__ = ["买股票 代码 金额]", "卖股票 代码 仓位（十分制）", "我的持仓", "强制清仓"]
-__plugin_version__ = 2.4
-__plugin_author__ = "XiaoR"
-__plugin_settings__ = {
-    "level": 5,
-    "default_status": True,
-    "limit_superuser": True,
-    "cmd": ["买股票", "买股票", "我的持仓"],
-}
-__plugin_configs__ = {
-    "GEARING_RATIO": {
-        "value": 5,
-        "help": "最大杠杆比率",
-        "default_value": 5,
-    },
-    "TANG_PING": {
-        "value": 0.015,
-        "help": "躺平基金每日收益",
-        "default_value": 0.015,
-    },
-    "WIN_FIT": {
-        "value": False,
-        "help": "如果我的持仓功能报错，且看了issue还是改不好，就把这个改成true",
-        "default_value": False,
-    },
-    "IMAGE_MODE": {
-        "value": 2,
-        "help": "1:股票提示图为百度股市通，比较新人  2:股票提示图为分时+日k且支持基金",
-        "default_value": 2,
-    }
-}
+    """.strip(),
+    extra=PluginExtraData(
+        author="XiaoR",
+        version="2.4",
+        commands=[Command(command="买股票", params=["代码", "金额", "杠杆"]),
+        Command(command="卖股票", params=["代码", "仓位"]),
+        Command(command="我的持仓"),
+        Command(command="强制清仓")],
+        menu_type="群内小游戏",
+        configs=[
+            RegisterConfig(
+                key="最大杠杆比率",
+                value=5,
+                help="最大杠杆比率",
+                default_value=5,
+                type=int,
+            ),
+            RegisterConfig(
+                key="躺平基金每日收益",
+                value=0.015,
+                help="躺平基金每日收益",
+                default_value=0.015,
+                type=float,
+            ),
+            RegisterConfig(
+                key="WIN_FIT",
+                value=False,
+                help="如果我的持仓功能报错，且看了issue还是改不好，就把这个改成true",
+                default_value=False,
+                type=bool,
+            ),
+            RegisterConfig(
+                key="股票提示图模式",
+                value=2,
+                help="1:股票提示图为百度股市通，比较新人  2:股票提示图为分时+日k且支持基金",
+                default_value=2,
+                type=int,
+            ),
+        ],
+    ).to_dict(),
+)
 
 buy_stock = on_command("买股票", aliases={"买入", "建仓", "买入股票"}, priority=5, block=True)
 sell_stock = on_command("卖股票", aliases={"卖出", "平仓", "卖出股票"}, priority=5, block=True)
@@ -137,7 +149,7 @@ async def buy_handle(bot, msg, event, session: Uninfo):
         cost = int(msg[1])
     stock_id = fill_stock_id(msg[0])
     origin_stock_id = stock_id[2:]
-    max_gearing = round(float(Config.get_config(plugin_name, "GEARING_RATIO", 5)), 1)
+    max_gearing = round(float(Config.get_config(plugin_name, "最大杠杆比率", 5)), 1)
     gearing = 0
     # 第三个参数是杠杆
     # 最大杠杆比率
@@ -321,7 +333,7 @@ async def _(bot: Bot, event: MessageEvent, arg: Message = CommandArg()):
 
 
 async def get_stock_img_(origin_stock_id, stock_id):
-    if Config.get_config(plugin_name, "IMAGE_MODE", 2) == 2:
+    if Config.get_config(plugin_name, "股票提示图模式", 2) == 2:
         return await get_stock_img_v2(origin_stock_id, stock_id)
     else:
         return await get_stock_img(origin_stock_id, stock_id)

@@ -45,7 +45,7 @@ async def buy_stock_action(user_id: int, group_id: int, stock_id: str, gearing: 
             if not gearing:
                 gearing = float(stock.gearing)
         if not gearing:
-            max_gearing = round(float(Config.get_config(plugin_name, "GEARING_RATIO", 5)), 1)
+            max_gearing = round(float(Config.get_config(plugin_name, "最大杠杆比率", 5)), 1)
             gearing = max_gearing
         gearing = round(gearing, 1)
         if (stock and have_gold == 0 and gearing == stock.gearing) or (stock is None and have_gold == 0):
@@ -262,7 +262,7 @@ async def buy_lazy_stock_action(user_id: int, group_id: int, cost: float, platfo
         t = await StockDB.buy_stock(uid, "躺平基金", 1, Decimal.from_float(real_cost), Decimal.from_float(cost))
         # await StockLogDB.buy_stock_log(uid, "躺平基金", 1, real_cost, 1, cost)
         return f"欢迎认购躺平基金！您认购了💰{cost}的躺平基金，每待满一天就会获得" \
-               f"{round(float(Config.get_config(plugin_name, 'TANG_PING', 0.015) * 100), 1)}%的收益！一定要待满才有哦"
+               f"{round(float(Config.get_config(plugin_name, "躺平基金每日收益", 0.015) * 100), 1)}%的收益！一定要待满才有哦"
 
 
 async def sell_lazy_stock_action(user_id: int, group_id: int, percent: float, platform: str | None = None):

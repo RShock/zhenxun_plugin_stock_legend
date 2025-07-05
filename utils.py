@@ -256,7 +256,7 @@ def fill_stock_id(stock_id: str) -> str:
 
 def get_tang_ping_earned(stock: StockDB, percent: float) -> tuple[int, float, int]:
     day = int(time.time() - time.mktime(stock.buy_time.timetuple())) // 60 // 60 // 24
-    tang_ping = float(Config.get_config(plugin_name, "TANG_PING", 0.015))
+    tang_ping = float(Config.get_config(plugin_name, "躺平基金每日收益", 0.015))
     rate = ((1 + tang_ping) ** day)  # 翻倍数
     return day, rate, round(float(stock.number) * rate * percent / 10)
 
@@ -297,6 +297,11 @@ async def get_stock_img_v2(origin_stock_id: str, stock_id: str, is_detail: bool 
         page = await browser.new_page()
         logger.info(url)
         await page.goto(url)
+        # 移除烦人的广告
+        ad_elements = page.locator('body > div[style*="position: fixed"]')
+        await ad_elements.evaluate_all("(elements) => elements.forEach(el => el.remove())")
+        other_divs = page.locator('body > div:nth-child(4), body > div:nth-child(5)')
+        await other_divs.evaluate_all("(elements) => elements.forEach(el => el.remove())")
 
         path = f"{IMAGE_PATH}/stock_legend/stockImg_{stock_id}_{time.time()}.png"
         if is_fund:
