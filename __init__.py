@@ -94,7 +94,7 @@ __plugin_meta__ = PluginMetadata(
     """.strip(),
     extra=PluginExtraData(
         author="XiaoR",
-        version="2.4",
+        version="3.0",
         commands=[
             Command(command="买股票", params=["代码", "金额", "杠杆"]),
             Command(command="卖股票", params=["代码", "仓位"]),
